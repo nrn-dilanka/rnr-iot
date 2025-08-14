@@ -166,9 +166,6 @@ services:
           memory: 192M
     restart: unless-stopped
 
-
-
-
 volumes:
   rnr_rabbitmq_data:
   rnr_postgres_data:
