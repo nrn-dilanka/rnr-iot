@@ -98,37 +98,4 @@ services:
       - rnr_iot_network
     restart: unless-stopped
 
-  # RNR Solutions - Frontend Web Application
-  rnr_frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: http://192.168.1.12:8000/api
-        REACT_APP_WS_URL: ws://192.168.1.12:8000/ws
-        REACT_APP_COMPANY_NAME: "RNR Solutions"
-        REACT_APP_PLATFORM_NAME: "RNR Solutions IoT Platform"
-    container_name: rnr_iot_frontend
-    ports:
-      - "3000:3000"
-    env_file:
-      - ./frontend/.env
-    environment:
-      REACT_APP_API_URL: http://192.168.1.12:8000/api
-      REACT_APP_WS_URL: ws://192.168.1.12:8000/ws
-      REACT_APP_COMPANY_NAME: "RNR Solutions"
-      REACT_APP_PLATFORM_NAME: "RNR Solutions IoT Platform"
-    depends_on:
-      - rnr_api_server
-    networks:
-      - rnr_iot_network
-    restart: unless-stopped
 
-volumes:
-  rnr_rabbitmq_data:
-  rnr_postgres_data:
-  rnr_firmware_uploads:
-
-networks:
-  rnr_iot_network:
-    driver: bridge
