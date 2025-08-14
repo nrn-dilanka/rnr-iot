@@ -1,0 +1,36 @@
+{
+  "name": "rnr-iot-platform",
+  "version": "2.0.0",
+  "description": "RNR Solutions Enterprise IoT Platform with automatic IP detection and device management",
+  "scripts": {
+    "auto-ip": "node auto-ip.js",
+    "setup": "npm run auto-ip && docker-compose up --build -d",
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "logs": "docker-compose logs -f",
+    "status": "docker-compose ps",
+    "clean": "docker-compose down -v --remove-orphans"
+  },
+  "keywords": [
+    "rnr-solutions",
+    "enterprise-iot",
+    "iot-platform",
+    "device-management",
+    "docker",
+    "react",
+    "fastapi",
+    "postgresql",
+    "rabbitmq",
+    "mqtt",
+    "esp32",
+    "real-time-monitoring"
+  ],
+  "author": "RNR Solutions Development Team",
+  "company": "RNR Solutions",
+  "license": "Proprietary",
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

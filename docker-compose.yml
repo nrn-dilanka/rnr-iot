@@ -1,0 +1,134 @@
+services:
+  # RNR Solutions - RabbitMQ Message Broker with MQTT plugin
+  rnr_rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rnr_iot_rabbitmq
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+      - "1883:1883"    # MQTT port
+    environment:
+      RABBITMQ_DEFAULT_USER: rnr_iot_user
+      RABBITMQ_DEFAULT_PASS: rnr_iot_2025!
+      RABBITMQ_DEFAULT_VHOST: rnr_iot_vhost
+    volumes:
+      - rnr_rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    networks:
+      - rnr_iot_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # RNR Solutions - PostgreSQL Database
+  rnr_postgres:
+    image: postgres:15
+    container_name: rnr_iot_postgres
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: rnr_iot_platform
+      POSTGRES_USER: rnr_iot_user
+      POSTGRES_PASSWORD: rnr_iot_2025!
+    volumes:
+      - rnr_postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - rnr_iot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rnr_iot_user -d rnr_iot_platform"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # RNR Solutions - Backend API Server
+  rnr_api_server:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.api
+    container_name: rnr_iot_api_server
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://rnr_iot_user:rnr_iot_2025!@rnr_postgres:5432/rnr_iot_platform
+      RABBITMQ_URL: amqp://rnr_iot_user:rnr_iot_2025!@rnr_rabbitmq:5672/rnr_iot_vhost
+      UPLOAD_DIR: /app/uploads
+      GEMINI_API_KEY: AIzaSyAs2JqPjvUcWeg5K2Vxeto7j37GzUzABUY
+      RNR_COMPANY_NAME: "RNR Solutions"
+      RNR_PLATFORM_VERSION: "2.0.0"
+    volumes:
+      - rnr_firmware_uploads:/app/uploads
+    depends_on:
+      rnr_postgres:
+        condition: service_healthy
+      rnr_rabbitmq:
+        condition: service_healthy
+    networks:
+      - rnr_iot_network
+    restart: unless-stopped
+
+  # RNR Solutions - Core Worker Service
+  rnr_worker_service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: rnr_iot_worker_service
+    env_file:
+      - .env
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://rnr_iot_user:rnr_iot_2025!@rnr_postgres:5432/rnr_iot_platform
+      RABBITMQ_URL: amqp://rnr_iot_user:rnr_iot_2025!@rnr_rabbitmq:5672/rnr_iot_vhost
+      API_URL: http://rnr_api_server:8000
+      GEMINI_API_KEY: AIzaSyAs2JqPjvUcWeg5K2Vxeto7j37GzUzABUY
+      RNR_COMPANY_NAME: "RNR Solutions"
+      RNR_PLATFORM_VERSION: "2.0.0"
+    depends_on:
+      rnr_postgres:
+        condition: service_healthy
+      rnr_rabbitmq:
+        condition: service_healthy
+    networks:
+      - rnr_iot_network
+    restart: unless-stopped
+
+  # RNR Solutions - Frontend Web Application
+  rnr_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://192.168.1.12:8000/api
+        REACT_APP_WS_URL: ws://192.168.1.12:8000/ws
+        REACT_APP_COMPANY_NAME: "RNR Solutions"
+        REACT_APP_PLATFORM_NAME: "RNR Solutions IoT Platform"
+    container_name: rnr_iot_frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env
+    environment:
+      REACT_APP_API_URL: http://192.168.1.12:8000/api
+      REACT_APP_WS_URL: ws://192.168.1.12:8000/ws
+      REACT_APP_COMPANY_NAME: "RNR Solutions"
+      REACT_APP_PLATFORM_NAME: "RNR Solutions IoT Platform"
+    depends_on:
+      - rnr_api_server
+    networks:
+      - rnr_iot_network
+    restart: unless-stopped
+
+volumes:
+  rnr_rabbitmq_data:
+  rnr_postgres_data:
+  rnr_firmware_uploads:
+
+networks:
+  rnr_iot_network:
+    driver: bridge
