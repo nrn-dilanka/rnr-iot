@@ -154,7 +154,7 @@ for i in {1..30}; do
 done
 
 # Start RabbitMQ
-print_status "Starting RabbitMQ..."
+print_status "Starting RabbitMQ with optimized configuration..."
 docker compose up -d rnr_rabbitmq || docker-compose up -d rnr_rabbitmq
 sleep 15
 
@@ -163,6 +163,14 @@ print_status "Waiting for RabbitMQ to be ready..."
 for i in {1..30}; do
     if docker exec rnr_iot_rabbitmq rabbitmq-diagnostics ping > /dev/null 2>&1; then
         print_status "RabbitMQ is ready"
+        
+        # Check for deprecation warnings
+        WARNINGS=$(docker logs rnr_iot_rabbitmq 2>&1 | grep -i "deprecated" | wc -l || echo "0")
+        if [ "$WARNINGS" -eq 0 ]; then
+            print_status "✓ RabbitMQ started without deprecation warnings"
+        else
+            print_warning "RabbitMQ has some warnings (this is normal on first start)"
+        fi
         break
     fi
     if [ $i -eq 30 ]; then

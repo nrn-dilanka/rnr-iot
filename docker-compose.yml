@@ -11,8 +11,6 @@ services:
       RABBITMQ_DEFAULT_USER: rnr_iot_user
       RABBITMQ_DEFAULT_PASS: rnr_iot_2025!
       RABBITMQ_DEFAULT_VHOST: rnr_iot_vhost
-      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.4
-      RABBITMQ_DISK_FREE_LIMIT: 50MB
     volumes:
       - rnr_rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
@@ -139,32 +137,7 @@ services:
           memory: 192M
     restart: unless-stopped
 
-  # RNR Solutions - Frontend React Application (Optimized for 2GB RAM)
-  rnr_frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: http://localhost/api
-        REACT_APP_WS_URL: ws://localhost/ws
-    container_name: rnr_iot_frontend
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost/api
-      REACT_APP_WS_URL: ws://localhost/ws
-      NODE_OPTIONS: "--max-old-space-size=256"
-    depends_on:
-      - rnr_api_server
-    networks:
-      - rnr_iot_network
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-        reservations:
-          memory: 192M
-    restart: unless-stopped
+  
 
 volumes:
   rnr_rabbitmq_data:
