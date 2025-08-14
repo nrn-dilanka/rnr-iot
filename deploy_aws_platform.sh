@@ -55,15 +55,15 @@ done
 
 # Stop any existing containers
 print_status "Stopping existing containers..."
-docker-compose down --remove-orphans || true
+docker compose down --remove-orphans || docker-compose down --remove-orphans || true
 
 # Pull latest images
 print_status "Pulling latest Docker images..."
-docker-compose pull
+docker compose pull || docker-compose pull
 
 # Build custom images
 print_status "Building application images..."
-docker-compose build --no-cache
+docker compose build --no-cache || docker-compose build --no-cache
 
 # Install nginx configuration
 print_status "Installing nginx configuration..."
@@ -85,7 +85,7 @@ chmod 755 ./uploads
 
 # Start the platform
 print_status "Starting RNR Solutions IoT Platform..."
-docker-compose up -d
+docker compose up -d || docker-compose up -d
 
 # Wait for services to start
 print_status "Waiting for services to start..."
@@ -127,12 +127,12 @@ echo "MQTT:         localhost:1883"
 
 echo ""
 print_status "Logs can be viewed with:"
-echo "docker-compose logs -f [service_name]"
+echo "docker compose logs -f [service_name] OR docker-compose logs -f [service_name]"
 echo "Available services: rnr_postgres, rnr_rabbitmq, rnr_api_server, rnr_worker_service"
 
 echo ""
 print_status "To stop the platform:"
-echo "docker-compose down"
+echo "docker compose down OR docker-compose down"
 
 echo ""
 print_status "To update the platform:"

@@ -39,12 +39,14 @@ fi
 print_status "Updating system packages..."
 apt update && apt upgrade -y
 
-# Install required packages
-print_status "Installing required packages..."
+# Remove any existing Docker packages that might conflict
+print_status "Removing any existing Docker packages..."
+apt remove -y docker docker-engine docker.io containerd runc containerd.io || true
+apt autoremove -y
+
+# Install basic required packages first
+print_status "Installing basic required packages..."
 apt install -y \
-    nginx \
-    docker.io \
-    docker-compose \
     curl \
     wget \
     git \
@@ -57,10 +59,30 @@ apt install -y \
     gnupg \
     lsb-release
 
-# Install Docker Compose v2
+# Install nginx separately
+print_status "Installing nginx..."
+apt install -y nginx
+
+# Add Docker's official GPG key and repository
+print_status "Adding Docker repository..."
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Update package index
+print_status "Updating package index with Docker repository..."
+apt update
+
+# Install Docker Engine
+print_status "Installing Docker Engine..."
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+
+# Install Docker Compose v2 (plugin)
 print_status "Installing Docker Compose v2..."
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+apt install -y docker-compose-plugin
+
+# Create symlink for docker-compose command compatibility
+ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose || true
 
 # Add current user to docker group (if not root)
 if [ "$SUDO_USER" ]; then
