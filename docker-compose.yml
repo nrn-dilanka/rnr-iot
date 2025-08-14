@@ -98,25 +98,6 @@ services:
       - rnr_iot_network
     restart: unless-stopped
 
-  # RNR Solutions - Frontend React Application
-  rnr_frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: http://localhost/api
-        REACT_APP_WS_URL: ws://localhost/ws
-    container_name: rnr_iot_frontend
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost/api
-      REACT_APP_WS_URL: ws://localhost/ws
-    depends_on:
-      - rnr_api_server
-    networks:
-      - rnr_iot_network
-    restart: unless-stopped
 
 
 
