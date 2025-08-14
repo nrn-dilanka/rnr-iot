@@ -99,3 +99,12 @@ services:
     restart: unless-stopped
 
 
+
+volumes:
+  rnr_rabbitmq_data:
+  rnr_postgres_data:
+  rnr_firmware_uploads:
+
+networks:
+  rnr_iot_network:
+    driver: bridge
