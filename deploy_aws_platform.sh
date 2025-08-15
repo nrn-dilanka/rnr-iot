@@ -67,6 +67,8 @@ docker compose build --no-cache || docker-compose build --no-cache
 
 # Install nginx configuration
 print_status "Installing nginx configuration..."
+# Remove default nginx site to avoid conflicts
+rm -f /etc/nginx/sites-enabled/default
 cp nginx.conf /etc/nginx/nginx.conf
 
 # Test nginx configuration
