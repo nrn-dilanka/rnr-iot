@@ -108,6 +108,11 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "platform": "enterprise_iot"}
 
+@app.get("/openapi.json")
+async def get_openapi():
+    """Custom OpenAPI JSON endpoint"""
+    return app.openapi()
+
 @app.get("/api/platform/stats")
 async def get_platform_stats():
     """Get platform statistics for business analytics"""
