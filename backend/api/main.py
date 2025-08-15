@@ -46,6 +46,7 @@ app = FastAPI(
     title="RNR Solutions IoT Platform",
     description="Enterprise-grade IoT monitoring and management platform developed by RNR Solutions. Comprehensive device management, real-time monitoring, and advanced analytics for industrial IoT applications.",
     version="2.0.0",
+    openapi_version="3.1.0",
     contact={
         "name": "RNR Solutions Support",
         "email": "support@rnrsolutions.com",
