@@ -102,6 +102,12 @@ services:
         reservations:
           memory: 256M
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
     # RNR Solutions - Core Worker Service (Optimized for 2GB RAM)
   rnr_worker_service:
