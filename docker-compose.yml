@@ -1,6 +1,9 @@
 services:
-  # RNR Solutions - RabbitMQ Message Broker with MQTT plugin (Optimized for 2GB RAM)
-  rnr_rabbitmq:
+  # RNR Solutions - RabbitMQ Message Broker with MQTT plugin (Optimized for 2GB RAM    depends_on:
+      rnr_rabbitmq:
+        condition: service_healthy
+      rnr_postgres:
+        condition: service_healthynr_rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rnr_iot_rabbitmq
     ports:
@@ -72,9 +75,9 @@ services:
       - RABBITMQ_URL=${RABBITMQ_URL}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
-      rnr_iot_postgres:
+      rnr_postgres:
         condition: service_healthy
-      rnr_iot_rabbitmq:
+      rnr_rabbitmq:
         condition: service_healthy
     networks:
       - rnr_iot_network
