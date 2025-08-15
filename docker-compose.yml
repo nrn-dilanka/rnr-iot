@@ -109,7 +109,7 @@ services:
       retries: 5
       start_period: 40s
 
-    # RNR Solutions - Core Worker Service (Optimized for 2GB RAM)
+  # RNR Solutions - Core Worker Service (Optimized for 2GB RAM)
   rnr_worker_service:
     build:
       context: ./backend
@@ -142,8 +142,6 @@ services:
         reservations:
           memory: 192M
     restart: unless-stopped
-
-  
 
 volumes:
   rnr_rabbitmq_data:
