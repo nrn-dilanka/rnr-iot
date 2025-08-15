@@ -4,6 +4,7 @@ import logging
 import asyncio
 import threading
 import requests
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
@@ -36,35 +37,47 @@ class WorkerService:
         self.offline_threshold = timedelta(seconds=10)  # Node offline after 10 seconds for faster detection
     
     def connect_rabbitmq(self):
-        """Connect to RabbitMQ"""
-        try:
-            self.connection = pika.BlockingConnection(pika.URLParameters(self.rabbitmq_url))
-            self.channel = self.connection.channel()
-            
-            # Declare exchange
-            self.channel.exchange_declare(
-                exchange='amq.topic',
-                exchange_type='topic',
-                durable=True
-            )
-            
-            # Declare queue for device data
-            result = self.channel.queue_declare(queue='device_data', durable=True)
-            queue_name = result.method.queue
-            
-            # Bind queue to exchange with routing key pattern
-            self.channel.queue_bind(
-                exchange='amq.topic',
-                queue=queue_name,
-                routing_key='devices.*.data'
-            )
-            
-            logger.info("Connected to RabbitMQ and set up queues")
-            return queue_name
-            
-        except Exception as e:
-            logger.error(f"Failed to connect to RabbitMQ: {e}")
-            raise
+        """Connect to RabbitMQ with retry logic"""
+        max_retries = 10
+        retry_delay = 1  # Initial delay in seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting to connect to RabbitMQ (attempt {attempt + 1}/{max_retries})")
+                self.connection = pika.BlockingConnection(pika.URLParameters(self.rabbitmq_url))
+                self.channel = self.connection.channel()
+                
+                # Declare exchange
+                self.channel.exchange_declare(
+                    exchange='amq.topic',
+                    exchange_type='topic',
+                    durable=True
+                )
+                
+                # Declare queue for device data
+                result = self.channel.queue_declare(queue='device_data', durable=True)
+                queue_name = result.method.queue
+                
+                # Bind queue to exchange with routing key pattern
+                self.channel.queue_bind(
+                    exchange='amq.topic',
+                    queue=queue_name,
+                    routing_key='devices.*.data'
+                )
+                
+                logger.info("Connected to RabbitMQ and set up queues")
+                return queue_name
+                
+            except Exception as e:
+                logger.error(f"Failed to connect to RabbitMQ (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                if attempt < max_retries - 1:  # Don't wait after the last attempt
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 30)  # Exponential backoff, max 30 seconds
+                else:
+                    logger.error("Failed to connect to RabbitMQ after all retries")
+                    raise
     
     def process_sensor_data(self, ch, method, properties, body):
         """Process incoming sensor data from devices"""
