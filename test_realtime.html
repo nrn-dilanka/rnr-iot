@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Real-time Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .data { background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .timestamp { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 Real-time Connection Test</h1>
+    
+    <div id="status" class="status disconnected">
+        🔴 Disconnected from WebSocket
+    </div>
+    
+    <div id="latestData" class="data">
+        <strong>Latest Data:</strong> No data received yet
+    </div>
+    
+    <div id="messages">
+        <h3>Real-time Messages:</h3>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const latestDataDiv = document.getElementById('latestData');
+        const messagesDiv = document.getElementById('messages');
+        
+        let messageCount = 0;
+        
+        function updateStatus(connected, message) {
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.innerHTML = `🟢 ${message}`;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.innerHTML = `🔴 ${message}`;
+            }
+        }
+        
+        function addMessage(data) {
+            messageCount++;
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'data';
+            messageDiv.innerHTML = `
+                <strong>Message #${messageCount}</strong><br>
+                <strong>Node:</strong> ${data.node_id}<br>
+                <strong>Temperature:</strong> ${data.data.temperature || 'N/A'}°C<br>
+                <strong>Humidity:</strong> ${data.data.humidity || 'N/A'}%<br>
+                <strong>Status:</strong> ${data.data.status}<br>
+                <strong>WiFi RSSI:</strong> ${data.data.wifi_rssi}dBm<br>
+                <div class="timestamp">Received: ${new Date().toLocaleTimeString()}</div>
+            `;
+            
+            // Update latest data
+            latestDataDiv.innerHTML = `
+                <strong>Latest Data from ${data.node_id}:</strong><br>
+                Temperature: ${data.data.temperature || 'N/A'}°C, 
+                Humidity: ${data.data.humidity || 'N/A'}%, 
+                Status: ${data.data.status}<br>
+                <div class="timestamp">Last updated: ${new Date().toLocaleTimeString()}</div>
+            `;
+            
+            // Add to messages (keep only last 5)
+            messagesDiv.insertBefore(messageDiv, messagesDiv.children[1]);
+            if (messagesDiv.children.length > 6) { // title + 5 messages
+                messagesDiv.removeChild(messagesDiv.lastChild);
+            }
+        }
+        
+        function connectWebSocket() {
+            updateStatus(false, 'Connecting to WebSocket...');
+            
+            const ws = new WebSocket('ws://localhost:8000/ws');
+            
+            ws.onopen = function() {
+                updateStatus(true, 'Connected to WebSocket - Waiting for ESP32 data...');
+                console.log('WebSocket connected successfully');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Received WebSocket message:', data);
+                    
+                    if (data.type === 'sensor_data') {
+                        addMessage(data);
+                        updateStatus(true, `Connected - Receiving ESP32 data (${messageCount} messages)`);
+                    }
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            };
+            
+            ws.onclose = function() {
+                updateStatus(false, 'Disconnected from WebSocket');
+                console.log('WebSocket disconnected');
+                
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                updateStatus(false, 'WebSocket error occurred');
+                console.error('WebSocket error:', error);
+            };
+        }
+        
+        // Start connection when page loads
+        connectWebSocket();
+    </script>
+</body>
+</html>

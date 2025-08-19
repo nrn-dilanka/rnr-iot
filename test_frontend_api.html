@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend API Test</title>
+</head>
+<body>
+    <h1>Frontend API Test</h1>
+    <button onclick="testFirmwareAPI()">Test Firmware API</button>
+    <button onclick="testNodesAPI()">Test Nodes API</button>
+    <div id="results"></div>
+
+    <script>
+        const API_URL = 'http://192.168.8.108:8000/api';
+        
+        async function testFirmwareAPI() {
+            try {
+                console.log('Testing firmware API...');
+                const response = await fetch(`${API_URL}/firmware`);
+                const data = await response.json();
+                console.log('Firmware API Response:', data);
+                document.getElementById('results').innerHTML = 
+                    '<h3>Firmware API Response:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                console.error('Firmware API Error:', error);
+                document.getElementById('results').innerHTML = 
+                    '<h3>Firmware API Error:</h3><pre>' + error.message + '</pre>';
+            }
+        }
+
+        async function testNodesAPI() {
+            try {
+                console.log('Testing nodes API...');
+                const response = await fetch(`${API_URL}/nodes`);
+                const data = await response.json();
+                console.log('Nodes API Response:', data);
+                document.getElementById('results').innerHTML = 
+                    '<h3>Nodes API Response:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                console.error('Nodes API Error:', error);
+                document.getElementById('results').innerHTML = 
+                    '<h3>Nodes API Error:</h3><pre>' + error.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

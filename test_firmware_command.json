@@ -1,0 +1,4 @@
+{
+  "action": "FIRMWARE_UPDATE",
+  "url": "http://192.168.8.108:8000/uploads/firmware_v1.1.2.bin"
+}
