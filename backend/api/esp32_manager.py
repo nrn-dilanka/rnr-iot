@@ -79,10 +79,32 @@ class ESP32DeviceManager:
             topic_parts = topic.split('/')
             if len(topic_parts) >= 3 and topic_parts[0] == "devices" and topic_parts[2] == "data":
                 device_id = topic_parts[1]
-                asyncio.create_task(self._process_device_message(device_id, payload))
+                
+                # Process the message synchronously to avoid event loop issues
+                self._process_device_message_sync(device_id, payload)
             
         except Exception as e:
             logger.error(f"Error processing device message: {e}")
+    
+    def _process_device_message_sync(self, device_id: str, payload: dict):
+        """Process incoming device data synchronously (called from MQTT callback)"""
+        try:
+            # Auto-register new device if not seen before
+            if device_id not in self.connected_devices:
+                self._auto_register_device_sync(device_id, payload)
+            
+            # Store sensor data
+            self._store_sensor_data_sync(device_id, payload)
+            
+            # Update device last seen
+            self._update_device_status_sync(device_id, payload)
+            
+            # For WebSocket broadcasting, we'll need to handle this differently
+            # since it requires async context
+            logger.info(f"📊 Processed data from device {device_id}: {payload}")
+            
+        except Exception as e:
+            logger.error(f"Error processing message from device {device_id}: {e}")
     
     async def _process_device_message(self, device_id: str, payload: dict):
         """Process incoming device data and auto-register new devices"""
@@ -107,6 +129,113 @@ class ESP32DeviceManager:
         except Exception as e:
             logger.error(f"Error processing message from device {device_id}: {e}")
     
+    def _auto_register_device_sync(self, device_id: str, payload: dict):
+        """Synchronously register a new ESP32 device"""
+        try:
+            logger.info(f"🔍 New ESP32 device discovered: {device_id}")
+            
+            # Get database session
+            db = next(get_db())
+            
+            try:
+                # Check if device already exists in database
+                existing_device = db.query(Node).filter(Node.node_id == device_id).first()
+                
+                if not existing_device:
+                    # Extract device information from payload
+                    device_name = f"ESP32-{device_id[-6:]}"  # Use last 6 chars of device ID
+                    
+                    # Create new device record
+                    new_device = Node(
+                        node_id=device_id,
+                        name=device_name,
+                        mac_address=device_id,  # Using device_id as MAC for now
+                        is_active="true",
+                        last_seen=datetime.utcnow()
+                    )
+                    
+                    db.add(new_device)
+                    db.commit()
+                    
+                    logger.info(f"✅ Auto-registered new ESP32 device: {device_name} ({device_id})")
+                    
+                    # Send welcome message to device
+                    self._send_welcome_message_sync(device_id)
+                    
+                else:
+                    # Device exists, just mark as active
+                    existing_device.is_active = "true"
+                    existing_device.last_seen = datetime.utcnow()
+                    db.commit()
+                    logger.info(f"🔄 ESP32 device reconnected: {existing_device.name} ({device_id})")
+                
+                # Add to connected devices set
+                self.connected_devices.add(device_id)
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error auto-registering device {device_id}: {e}")
+    
+    def _send_welcome_message_sync(self, device_id: str):
+        """Send a welcome message to newly discovered device (synchronous)"""
+        try:
+            welcome_command = {
+                "action": "STATUS_REQUEST",
+                "message": "Welcome to RNR Solutions IoT Platform! Device auto-registered successfully.",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            command_topic = self.command_topic_pattern.format(device_id)
+            self.mqtt_client.publish(command_topic, json.dumps(welcome_command))
+            
+            logger.info(f"📨 Sent welcome message to device: {device_id}")
+            
+        except Exception as e:
+            logger.error(f"Error sending welcome message to {device_id}: {e}")
+    
+    def _store_sensor_data_sync(self, device_id: str, payload: dict):
+        """Store sensor data in database (synchronous)"""
+        try:
+            db = next(get_db())
+            
+            try:
+                # Create sensor data record
+                sensor_data = SensorData(
+                    node_id=device_id,
+                    data=payload  # Store full payload as JSON
+                )
+                
+                db.add(sensor_data)
+                db.commit()
+                
+                logger.debug(f"💾 Stored sensor data for device {device_id}")
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error storing sensor data for {device_id}: {e}")
+    
+    def _update_device_status_sync(self, device_id: str, payload: dict):
+        """Update device status and last seen timestamp (synchronous)"""
+        try:
+            db = next(get_db())
+            
+            try:
+                device = db.query(Node).filter(Node.node_id == device_id).first()
+                if device:
+                    device.last_seen = datetime.utcnow()
+                    device.is_active = "true"
+                    db.commit()
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Error updating device status for {device_id}: {e}")
+
     async def _auto_register_device(self, device_id: str, payload: dict):
         """Automatically register a new ESP32 device when it first connects"""
         try:
@@ -150,7 +279,7 @@ class ESP32DeviceManager:
                     })
                 else:
                     # Device exists, just mark as active
-                    existing_device.is_active = True
+                    existing_device.is_active = "true"
                     existing_device.last_seen = datetime.utcnow()
                     db.commit()
                     logger.info(f"🔄 ESP32 device reconnected: {existing_device.name} ({device_id})")
@@ -189,10 +318,7 @@ class ESP32DeviceManager:
             try:
                 # Create sensor data record
                 sensor_data = SensorData(
-                    device_id=device_id,
-                    timestamp=datetime.utcnow(),
-                    temperature=payload.get("temperature"),
-                    humidity=payload.get("humidity"),
+                    node_id=device_id,
                     data=payload  # Store full payload as JSON
                 )
                 

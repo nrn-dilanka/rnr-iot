@@ -21,6 +21,7 @@ class Node(Base):
     node_id = Column(String, unique=True, index=True, nullable=False)
     name = Column(String)
     mac_address = Column(String)
+    is_active = Column(String, default="true")  # Store as string for compatibility
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime)
     
