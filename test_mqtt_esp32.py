@@ -9,10 +9,10 @@ import time
 from datetime import datetime
 
 # MQTT Configuration
-MQTT_BROKER = "192.168.8.105"
+MQTT_BROKER = "16.171.30.3"
 MQTT_PORT = 1883
-MQTT_USER = "iotuser"
-MQTT_PASSWORD = "iotpassword"
+MQTT_USER = "rnr_iot_user"
+MQTT_PASSWORD = "rnr_iot_2025!"
 TOPIC = "devices/441793F9456C/data"
 
 def on_connect(client, userdata, flags, rc):

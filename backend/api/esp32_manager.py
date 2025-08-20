@@ -24,10 +24,10 @@ class ESP32DeviceManager:
         self.db_session = None
         
         # MQTT Configuration
-        self.mqtt_host = "rabbitmq"
+        self.mqtt_host = "16.171.30.3"
         self.mqtt_port = 1883
-        self.mqtt_user = "iotuser"
-        self.mqtt_password = "iotpassword"
+        self.mqtt_user = "rnr_iot_user"
+        self.mqtt_password = "rnr_iot_2025!"
         
         # Device discovery topics
         self.data_topic_pattern = "devices/+/data"

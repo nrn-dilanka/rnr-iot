@@ -27,7 +27,7 @@ class ESP32Simulator:
     def connect_mqtt(self):
         """Connect to MQTT broker"""
         self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, f"esp32_sim_{self.device_id}")
-        self.mqtt_client.username_pw_set("iotuser", "iotpassword")
+        self.mqtt_client.username_pw_set("rnr_iot_user", "rnr_iot_2025!")
         
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
@@ -68,7 +68,7 @@ class ESP32Simulator:
         self.mqtt_client.on_message = on_message
         
         try:
-            self.mqtt_client.connect("192.168.8.105", 1883, 60)
+            self.mqtt_client.connect("16.171.30.3", 1883, 60)
             self.mqtt_client.loop_start()
             return True
         except Exception as e:
@@ -213,7 +213,7 @@ class ESP32FleetSimulator:
         
         self.running = True
         print(f"\n✅ All {len(self.devices)} ESP32 devices are now sending data!")
-        print("🌐 Open your dashboard at: http://192.168.8.105:3000")
+        print("🌐 Open your dashboard at: http://localhost:3000")
         print("📊 Navigate to 'ESP32 Manager' to see real-time updates")
         print("🔄 Press Ctrl+C to stop simulation")
     
