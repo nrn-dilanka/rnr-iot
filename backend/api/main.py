@@ -15,7 +15,6 @@ from api.websocket import websocket_manager
 from api.services import get_sensor_data_service, SensorDataService
 from api.esp32_manager import esp32_device_manager
 from api.auth import router as auth_router
-from api.user_management import router as user_router
 from api.permissions import BusinessActivityLogger
 
 # Configure logging
@@ -73,7 +72,6 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(auth_router, prefix="/api/auth")
-app.include_router(user_router, prefix="/api")
 app.include_router(router, prefix="/api")
 app.include_router(water_router, prefix="/api")
 app.include_router(greenhouse_router, prefix="/api")

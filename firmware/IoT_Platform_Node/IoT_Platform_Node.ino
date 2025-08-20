@@ -67,10 +67,10 @@ unsigned long debounceDelay = 50;
 int staReconnectFailures = 0;
 
 // MQTT Configuration
-const char* mqtt_server = "192.168.8.105";
+const char* mqtt_server = "16.171.30.3";
 const int mqtt_port = 1883;
-const char* mqtt_user = "iotuser";
-const char* mqtt_password = "iotpassword";
+const char* mqtt_user = "rnr_iot_user";
+const char* mqtt_password = "rnr_iot_2025!";
 
 // MQTT retry configuration
 int mqtt_retry_count = 0;
