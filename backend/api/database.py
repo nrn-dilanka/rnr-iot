@@ -22,6 +22,7 @@ class Node(Base):
     name = Column(String)
     mac_address = Column(String)
     is_active = Column(String, default="true")  # Store as string for compatibility
+    status = Column(String, default="offline")  # Device connection status
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime)
     

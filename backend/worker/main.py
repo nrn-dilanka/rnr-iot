@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 class WorkerService:
     def __init__(self):
-        self.database_url = os.getenv("DATABASE_URL", "postgresql://iotuser:iotpassword@localhost:5432/iot_platform")
-        self.rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://iotuser:iotpassword@localhost:5672/iot_vhost")
-        self.api_url = os.getenv("API_URL", "http://localhost:8000")
+        self.database_url = os.getenv("DATABASE_URL", "postgresql://rnr_iot_user:rnr_iot_2025!@localhost:5432/rnr_iot_platform")
+        self.rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://rnr_iot_user:rnr_iot_2025!@localhost:5672/rnr_iot_vhost")
+        self.api_url = os.getenv("API_URL", "http://localhost:3005")
         
         # Database connection
         self.engine = create_engine(self.database_url)
@@ -157,17 +157,23 @@ class WorkerService:
         db = self.SessionLocal()
         try:
             query = text("""
-                INSERT INTO nodes (node_id, status, last_seen, created_at)
-                VALUES (:node_id, 'online', :last_seen, :created_at)
+                INSERT INTO nodes (node_id, name, mac_address, status, is_active, last_seen, created_at)
+                VALUES (:node_id, :name, :mac_address, 'online', 'true', :last_seen, :created_at)
                 ON CONFLICT (node_id)
                 DO UPDATE SET 
                     status = 'online',
+                    is_active = 'true',
                     last_seen = EXCLUDED.last_seen
             """)
             
             now = datetime.utcnow()
+            # Generate a name if this is a new node
+            device_name = f"ESP32-{node_id[-6:]}" if len(node_id) >= 6 else f"ESP32-{node_id}"
+            
             db.execute(query, {
                 'node_id': node_id,
+                'name': device_name,
+                'mac_address': node_id,  # Use node_id as mac_address for now
                 'last_seen': now,
                 'created_at': now
             })
