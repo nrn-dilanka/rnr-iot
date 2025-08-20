@@ -27,15 +27,13 @@ async def get_all_esp32_devices(db: Session = Depends(get_db)):
         for device in devices:
             device_dict = {
                 "id": device.id,
-                "device_id": device.device_id,
+                "device_id": device.node_id,  # Use node_id as device_id
                 "name": device.name,
-                "device_type": device.device_type,
-                "location": device.location,
+                "mac_address": device.mac_address,
                 "is_active": device.is_active,
-                "capabilities": device.capabilities,
                 "last_seen": device.last_seen.isoformat() if device.last_seen else None,
-                "status": device.status,
-                "is_connected": device.device_id in connected_devices
+                "created_at": device.created_at.isoformat() if device.created_at else None,
+                "is_connected": device.node_id in connected_devices
             }
             device_list.append(device_dict)
         
@@ -197,13 +195,13 @@ async def request_esp32_status(device_id: str):
 async def update_esp32_device(device_id: str, device_update: Dict[str, Any], db: Session = Depends(get_db)):
     """Update ESP32 device information"""
     try:
-        device = db.query(Device).filter(Device.device_id == device_id).first()
+        device = db.query(Node).filter(Node.node_id == device_id).first()
         
         if not device:
             raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
         
         # Update allowed fields
-        allowed_fields = ["name", "location", "device_type"]
+        allowed_fields = ["name", "mac_address"]
         for field, value in device_update.items():
             if field in allowed_fields and hasattr(device, field):
                 setattr(device, field, value)
@@ -214,10 +212,9 @@ async def update_esp32_device(device_id: str, device_update: Dict[str, Any], db:
             "success": True,
             "message": f"Device {device_id} updated successfully",
             "device": {
-                "device_id": device.device_id,
+                "device_id": device.node_id,
                 "name": device.name,
-                "location": device.location,
-                "device_type": device.device_type
+                "mac_address": device.mac_address
             }
         }
         
@@ -231,7 +228,7 @@ async def update_esp32_device(device_id: str, device_update: Dict[str, Any], db:
 async def delete_esp32_device(device_id: str, db: Session = Depends(get_db)):
     """Delete ESP32 device from system"""
     try:
-        device = db.query(Device).filter(Device.device_id == device_id).first()
+        device = db.query(Node).filter(Node.node_id == device_id).first()
         
         if not device:
             raise HTTPException(status_code=404, detail=f"Device {device_id} not found")
@@ -258,15 +255,15 @@ async def delete_esp32_device(device_id: str, db: Session = Depends(get_db)):
 async def get_esp32_stats(db: Session = Depends(get_db)):
     """Get ESP32 system statistics"""
     try:
-        total_devices = db.query(Device).count()
-        active_devices = db.query(Device).filter(Device.is_active == True).count()
+        total_devices = db.query(Node).count()
+        active_devices = db.query(Node).filter(Node.is_active == "true").count()
         connected_devices = len(esp32_device_manager.get_connected_devices())
         
         return {
             "total_devices": total_devices,
             "active_devices": active_devices,
             "connected_devices": connected_devices,
-            "offline_devices": active_devices - connected_devices
+            "offline_devices": max(0, active_devices - connected_devices)
         }
         
     except Exception as e:
