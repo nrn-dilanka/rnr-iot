@@ -380,7 +380,7 @@ class PerformanceStressTest:
         # Temperature based on location/type
         if 'server' in node_name.lower() or 'cold' in node_name.lower():
             temp = round(random.uniform(18.0, 25.0), 1)
-        elif 'greenhouse' in node_name.lower():
+        elif 'industrial' in node_name.lower():
             temp = round(random.uniform(22.0, 32.0), 1)
         elif 'outdoor' in node_name.lower():
             temp = round(random.uniform(15.0, 35.0), 1)
@@ -390,7 +390,7 @@ class PerformanceStressTest:
         data_parts.append(f"🌡️{temp}°C")
         
         # Humidity (if applicable)
-        if any(word in node_name.lower() for word in ['greenhouse', 'outdoor', 'sensor', 'esp32', 'raspberry']):
+        if any(word in node_name.lower() for word in ['industrial', 'outdoor', 'sensor', 'esp32', 'raspberry']):
             humidity = round(random.uniform(40.0, 80.0), 1)
             data_parts.append(f"💧{humidity}%")
         
@@ -541,7 +541,7 @@ class PerformanceStressTest:
                 # Recent alerts/events
                 if random.random() > 0.7:  # Occasional alerts
                     alerts = [
-                        "🔔 Temperature spike detected in Greenhouse Zone A",
+                        "🔔 Temperature spike detected in Industrial Zone A",
                         "📊 Data collection rate increased by 15%",
                         "🔄 Node ESP32_1234 reconnected successfully",
                         "⚡ High activity detected in Server Room",
@@ -592,7 +592,7 @@ class PerformanceStressTest:
                         # Generate realistic temperature based on node type/location
                         if 'server' in node_name.lower() or 'cold' in node_name.lower():
                             temp_range = (18.0, 25.0)
-                        elif 'greenhouse' in node_name.lower():
+                        elif 'industrial' in node_name.lower():
                             temp_range = (22.0, 32.0)
                         elif 'outdoor' in node_name.lower():
                             temp_range = (15.0, 35.0)
@@ -685,7 +685,7 @@ class PerformanceStressTest:
         temp_nodes = []
         node_configs = [
             {"type": "ESP32", "location": "Server Room", "temp_range": (18.0, 25.0)},
-            {"type": "Arduino", "location": "Greenhouse Zone A", "temp_range": (22.0, 30.0)},
+            {"type": "Arduino", "location": "Industrial Zone A", "temp_range": (22.0, 30.0)},
             {"type": "RaspberryPi", "location": "Outdoor Station", "temp_range": (15.0, 35.0)},
             {"type": "Sensor_Module", "location": "Cold Storage", "temp_range": (2.0, 8.0)}
         ]

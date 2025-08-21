@@ -82,7 +82,21 @@ curl -s http://localhost:3005/api/sensor-data/latest || echo "Failed"
 echo -e "\n8. Water Systems:"
 curl -s http://localhost:3005/api/water/systems | head -c 200 || echo "Failed"; echo ""
 
-echo -e "\n9. Greenhouse Zones:"
+echo -e "\n9. Industrial Zones:"
+curl -s http://localhost:3005/api/nodes | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if isinstance(data, list):
+        nodes = data
+    else:
+        nodes = data.get('nodes', [])
+    print(f'✅ {len(nodes)} industrial zones configured')
+    for node in nodes[:2]:
+        print(f'   • {node[\"name\"]} - {node[\"status\"]}')
+except:
+    print('❌ Failed to get industrial zones')
+" || echo "Failed"
 
 echo ""
 echo "=== Core Endpoint Health Check ==="
