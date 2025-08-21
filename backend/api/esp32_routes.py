@@ -251,6 +251,42 @@ async def delete_esp32_device(device_id: str, db: Session = Depends(get_db)):
         logger.error(f"Error deleting device {device_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@router.get("/esp32/control/{device_id}")
+async def get_esp32_control_status(device_id: str, db: Session = Depends(get_db)):
+    """Get ESP32 device control status and available commands"""
+    try:
+        device = db.query(Node).filter(Node.node_id == device_id).first()
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        # Check if device is connected
+        connected_devices = esp32_device_manager.get_connected_devices()
+        is_connected = device_id in connected_devices
+        
+        available_commands = [
+            "REBOOT", "STATUS", "SERVO_CONTROL", "LED_ON", "LED_OFF", 
+            "FAN_ON", "FAN_OFF", "RESET_CONFIG"
+        ]
+        
+        return {
+            "device_id": device_id,
+            "status": "online" if is_connected else "offline",
+            "is_connected": is_connected,
+            "available_commands": available_commands,
+            "last_command_time": device.updated_at.isoformat() if device.updated_at else None,
+            "device_info": {
+                "name": device.name,
+                "location": device.location,
+                "firmware_version": getattr(device, 'firmware_version', 'unknown')
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting control status for device {device_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 @router.get("/esp32/stats")
 async def get_esp32_stats(db: Session = Depends(get_db)):
     """Get ESP32 system statistics"""
