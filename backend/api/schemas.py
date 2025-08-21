@@ -18,6 +18,8 @@ class NodeResponse(NodeBase):
     id: int
     created_at: datetime
     last_seen: Optional[datetime] = None
+    is_active: Optional[str] = None
+    status: Optional[str] = None
     
     class Config:
         from_attributes = True

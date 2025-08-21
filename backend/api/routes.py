@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
-from api.database import get_db
+from api.database import get_db, Node
 from api.schemas import (
     NodeCreate, NodeUpdate, NodeResponse, NodeAction, ActionResponse,
     FirmwareCreate, FirmwareResponse, FirmwareDeployment, SensorDataResponse,
@@ -104,6 +104,98 @@ async def delete_node(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete node"
+        )
+
+@router.get("/nodes/online", response_model=List[NodeResponse])
+async def get_online_nodes(
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Get all online nodes (last seen within 5 minutes)"""
+    try:
+        from datetime import datetime, timedelta
+        cutoff_time = datetime.utcnow() - timedelta(minutes=5)
+        
+        # Get all nodes and filter for online ones
+        all_nodes = node_service.get_nodes()
+        online_nodes = []
+        
+        for node in all_nodes:
+            if (node.last_seen and node.last_seen > cutoff_time and 
+                node.is_active == "true" and node.status == "online"):
+                online_nodes.append(node)
+        
+        return online_nodes
+    except Exception as e:
+        logger.error(f"Error fetching online nodes: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch online nodes"
+        )
+
+@router.put("/nodes/{node_id}/activate")
+async def activate_node(
+    node_id: str,
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Activate a node (set is_active to true)"""
+    try:
+        node = node_service.get_node(node_id)
+        if not node:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Node not found"
+            )
+        
+        # Update node status
+        from api.database import get_db
+        db = next(get_db())
+        db.query(Node).filter(Node.node_id == node_id).update({
+            "is_active": "true",
+            "status": "online" if node.last_seen and (datetime.utcnow() - node.last_seen).total_seconds() < 300 else "offline"
+        })
+        db.commit()
+        
+        return {"message": f"Node {node_id} activated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error activating node {node_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to activate node"
+        )
+
+@router.put("/nodes/{node_id}/deactivate")
+async def deactivate_node(
+    node_id: str,
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Deactivate a node (set is_active to false)"""
+    try:
+        node = node_service.get_node(node_id)
+        if not node:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Node not found"
+            )
+        
+        # Update node status
+        from api.database import get_db
+        db = next(get_db())
+        db.query(Node).filter(Node.node_id == node_id).update({
+            "is_active": "false",
+            "status": "offline"
+        })
+        db.commit()
+        
+        return {"message": f"Node {node_id} deactivated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deactivating node {node_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to deactivate node"
         )
 
 @router.post("/nodes/{node_id}/actions", response_model=ActionResponse)
