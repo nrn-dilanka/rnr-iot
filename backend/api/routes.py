@@ -134,6 +134,21 @@ async def get_online_nodes(
             detail="Failed to fetch online nodes"
         )
 
+@router.get("/nodes/count")
+async def get_nodes_count(
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Get total count of nodes"""
+    try:
+        nodes = node_service.get_nodes()
+        return {"count": len(nodes)}
+    except Exception as e:
+        logger.error(f"Error getting node count: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get node count"
+        )
+
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
 async def get_node(
     node_id: str,
@@ -304,7 +319,69 @@ async def send_node_action(
         logger.error(f"Error sending command to node {node_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send command via WiFi/MQTT: {str(e)}"
+            detail=f"Failed to send command: {str(e)}"
+        )
+
+# Alias for singular action endpoint (for compatibility)
+@router.post("/nodes/{node_id}/action", response_model=ActionResponse)
+async def send_node_action_singular(
+    node_id: str,
+    action: NodeAction,
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Send a command to a node (CONTROL) - singular alias"""
+    return await send_node_action(node_id, action, node_service)
+
+# Firmware deployment endpoint
+@router.post("/nodes/{node_id}/firmware", response_model=ActionResponse)
+async def deploy_firmware_to_node(
+    node_id: str,
+    deployment: FirmwareDeployment,
+    node_service: NodeService = Depends(get_node_service),
+    firmware_service: FirmwareService = Depends(get_firmware_service)
+):
+    """Deploy firmware to a specific node"""
+    # Verify node exists
+    node = node_service.get_node(node_id)
+    if not node:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Node not found"
+        )
+    
+    # Verify firmware exists
+    firmware = firmware_service.get_firmware(deployment.firmware_id)
+    if not firmware:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Firmware not found"
+        )
+    
+    try:
+        # Send firmware update command via MQTT
+        from api.esp32_manager import esp32_device_manager
+        
+        command = {
+            "action": "FIRMWARE_UPDATE",
+            "firmware_url": firmware.file_url,
+            "firmware_version": firmware.version
+        }
+        
+        success = await esp32_device_manager.send_command_to_device(node_id, command)
+        
+        if success:
+            logger.info(f"✅ Firmware deployment initiated for device {node_id}")
+            return ActionResponse(message=f"Firmware v{firmware.version} deployment initiated successfully")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initiate firmware deployment"
+            )
+    except Exception as e:
+        logger.error(f"Error deploying firmware to node {node_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to deploy firmware: {str(e)}"
         )
 
 # Firmware management endpoints
@@ -358,6 +435,35 @@ async def get_firmware_versions(
     try:
         firmwares = firmware_service.get_firmwares()
         return firmwares
+    except Exception as e:
+        logger.error(f"Error fetching firmware versions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch firmware versions"
+        )
+
+@router.get("/firmware/{firmware_id}", response_model=FirmwareResponse)
+async def get_firmware(
+    firmware_id: int,
+    firmware_service: FirmwareService = Depends(get_firmware_service)
+):
+    """Get details for a specific firmware version"""
+    try:
+        firmware = firmware_service.get_firmware(firmware_id)
+        if not firmware:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Firmware not found"
+            )
+        return firmware
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching firmware {firmware_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch firmware"
+        )
     except Exception as e:
         logger.error(f"Error fetching firmware versions: {e}")
         raise HTTPException(
@@ -1077,6 +1183,87 @@ async def get_ai_decisions():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get AI decisions"
+        )
+
+# Additional system endpoints to fix 404 errors
+@router.get("/monitoring/dashboard")
+async def get_monitoring_dashboard():
+    """Get monitoring dashboard data"""
+    try:
+        from api.database import get_db
+        db = next(get_db())
+        
+        # Basic monitoring data
+        total_devices = db.query(Node).count()
+        active_devices = db.query(Node).filter(Node.is_active == "true").count()
+        data_points_24h = db.query(SensorData).filter(
+            SensorData.timestamp >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+        
+        return {
+            "status": "operational",
+            "total_devices": total_devices,
+            "active_devices": active_devices,
+            "offline_devices": max(0, total_devices - active_devices),
+            "data_points_24h": data_points_24h,
+            "system_health": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "alerts": [],
+            "recent_activity": []
+        }
+    except Exception as e:
+        logger.error(f"Error getting monitoring dashboard: {e}")
+        return {
+            "status": "error",
+            "total_devices": 0,
+            "active_devices": 0,
+            "offline_devices": 0,
+            "data_points_24h": 0,
+            "system_health": "error",
+            "timestamp": datetime.utcnow().isoformat(),
+            "alerts": [{"type": "error", "message": "Dashboard data unavailable"}],
+            "recent_activity": []
+        }
+
+@router.get("/sensor-data/latest")
+async def get_latest_sensor_data(
+    limit: int = Query(10, ge=1, le=100, description="Number of latest records to return"),
+    sensor_data_service: SensorDataService = Depends(get_sensor_data_service)
+):
+    """Get latest sensor data across all nodes"""
+    try:
+        data = sensor_data_service.get_latest_sensor_data(limit=limit)
+        return data
+    except Exception as e:
+        logger.error(f"Error fetching latest sensor data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch latest sensor data"
+        )
+
+@router.post("/sensor-data")
+async def submit_sensor_data(
+    data: dict,
+    sensor_data_service: SensorDataService = Depends(get_sensor_data_service)
+):
+    """Submit new sensor data"""
+    try:
+        # Validate required fields
+        if "node_id" not in data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="node_id is required"
+            )
+        
+        result = sensor_data_service.create_sensor_data(data)
+        return {"message": "Sensor data submitted successfully", "id": result.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting sensor data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit sensor data"
         )
 
 # Additional system endpoints to fix 404 errors

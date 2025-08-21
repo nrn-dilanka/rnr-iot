@@ -11,6 +11,34 @@ from .permissions import require_water_control, require_sensor_access, BusinessA
 
 router = APIRouter(prefix="/water", tags=["water"])
 
+# Water systems mock database
+water_systems_db = [
+    {
+        "id": 1,
+        "name": "Primary Irrigation System",
+        "status": "active",
+        "flow_rate": 25.5,
+        "pressure": 2.3,
+        "temperature": 22.5,
+        "ph": 7.2,
+        "tds": 650,
+        "location": "Greenhouse Zone A",
+        "last_updated": datetime.now().isoformat()
+    },
+    {
+        "id": 2,
+        "name": "Secondary Irrigation System",
+        "status": "inactive",
+        "flow_rate": 0.0,
+        "pressure": 0.0,
+        "temperature": 20.0,
+        "ph": None,
+        "tds": None,
+        "location": "Greenhouse Zone B",
+        "last_updated": datetime.now().isoformat()
+    }
+]
+
 # Background task for simulating real-time data updates
 async def simulate_water_data_updates():
     """Background task to simulate real-time water system data updates"""
