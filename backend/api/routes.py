@@ -55,6 +55,39 @@ async def get_nodes(
             detail="Failed to fetch nodes"
         )
 
+@router.get("/nodes/online", response_model=List[NodeResponse])
+async def get_online_nodes(
+    node_service: NodeService = Depends(get_node_service)
+):
+    """Get all online nodes (last seen within 5 minutes)"""
+    try:
+        from datetime import datetime, timedelta, timezone
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+        
+        # Get all nodes and filter for online ones
+        all_nodes = node_service.get_nodes()
+        online_nodes = []
+        
+        for node in all_nodes:
+            if node.last_seen and node.is_active == "true":
+                # Make sure last_seen is timezone-aware for comparison
+                last_seen = node.last_seen
+                if last_seen.tzinfo is None:
+                    last_seen = last_seen.replace(tzinfo=timezone.utc)
+                
+                if last_seen > cutoff_time:
+                    # Accept any status that's not "offline" for online nodes
+                    if node.status and node.status != "offline":
+                        online_nodes.append(node)
+        
+        return online_nodes
+    except Exception as e:
+        logger.error(f"Error fetching online nodes: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch online nodes"
+        )
+
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
 async def get_node(
     node_id: str,
@@ -104,32 +137,6 @@ async def delete_node(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete node"
-        )
-
-@router.get("/nodes/online", response_model=List[NodeResponse])
-async def get_online_nodes(
-    node_service: NodeService = Depends(get_node_service)
-):
-    """Get all online nodes (last seen within 5 minutes)"""
-    try:
-        from datetime import datetime, timedelta
-        cutoff_time = datetime.utcnow() - timedelta(minutes=5)
-        
-        # Get all nodes and filter for online ones
-        all_nodes = node_service.get_nodes()
-        online_nodes = []
-        
-        for node in all_nodes:
-            if (node.last_seen and node.last_seen > cutoff_time and 
-                node.is_active == "true" and node.status == "online"):
-                online_nodes.append(node)
-        
-        return online_nodes
-    except Exception as e:
-        logger.error(f"Error fetching online nodes: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch online nodes"
         )
 
 @router.put("/nodes/{node_id}/activate")

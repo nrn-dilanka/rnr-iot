@@ -228,7 +228,15 @@ class ESP32DeviceManager:
                 if device:
                     device.last_seen = datetime.utcnow()
                     device.is_active = "true"
+                    
+                    # Update status based on payload
+                    if payload.get("type") == "heartbeat" or payload.get("status"):
+                        device.status = payload.get("status", "online")
+                    else:
+                        device.status = "online"  # Default to online if receiving data
+                    
                     db.commit()
+                    logger.debug(f"📊 Updated device {device_id} status to {device.status}")
                 
             finally:
                 db.close()
