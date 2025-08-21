@@ -53,11 +53,13 @@ class UserResponse(BaseModel):
     username: str
     email: str
     full_name: str
-    student_id: Optional[str]
+    student_id: Optional[str] = None
+    employee_id: Optional[str] = None
     department: str
     role: UserRole
     status: UserStatus
-    research_area: Optional[str]
+    research_area: Optional[str] = None
+    business_area: Optional[str] = None
     created_at: datetime
     last_login: Optional[datetime]
     login_count: int
@@ -106,11 +108,30 @@ users_db = [
         "email": "alice@rnrsolutions.com",
         "password": bcrypt.hashpw("operator123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
         "full_name": "Alice Johnson",
+        "student_id": None,
         "employee_id": "EMP2025001",
-        "department": "Computer Science",
+        "department": "Operations",
         "role": UserRole.OPERATOR,
         "status": UserStatus.ACTIVE,
+        "research_area": None,
         "business_area": "Water Management Systems",
+        "created_at": datetime.now(),
+        "last_login": None,
+        "login_count": 0
+    },
+    {
+        "id": 4,
+        "username": "technician_bob",
+        "email": "bob@rnrsolutions.com",
+        "password": bcrypt.hashpw("tech123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
+        "full_name": "Bob Wilson",
+        "student_id": None,
+        "employee_id": "EMP2025002",
+        "department": "Maintenance",
+        "role": UserRole.OPERATOR,
+        "status": UserStatus.ACTIVE,
+        "research_area": None,
+        "business_area": "Industrial Equipment Maintenance",
         "created_at": datetime.now(),
         "last_login": None,
         "login_count": 0
@@ -316,12 +337,15 @@ async def get_system_stats(current_user: dict = Depends(require_role([UserRole.S
     superusers = len([u for u in users_db if u["role"] == UserRole.SUPERUSER])
     
     return {
-        "total_users": total_users,
+        "user_count": total_users,
         "active_users": active_users,
         "inactive_users": total_users - active_users,
-        "operators": operators,
-        "admins": admins,
-        "superusers": superusers,
-        "total_activities": len(activity_logs),
-        "system_uptime": datetime.now() - datetime(2025, 7, 28)
+        "role_distribution": {
+            "operators": operators,
+            "admins": admins,
+            "superusers": superusers
+        },
+        "recent_activity": activity_logs[-10:] if activity_logs else [],
+        "system_status": "operational",
+        "platform_type": "industrial_iot"
     }
