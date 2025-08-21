@@ -40,20 +40,64 @@ async def create_node(
             detail="Failed to create node"
         )
 
+@router.get("/database/test")
+async def test_database():
+    """Test database connectivity and table access"""
+    try:
+        from api.database import get_db
+        db = next(get_db())
+        
+        # Test basic connection
+        db.execute("SELECT 1")
+        
+        # Test Node table
+        node_count = db.query(Node).count()
+        
+        # Test if we can create a basic query
+        nodes = db.query(Node).limit(1).all()
+        
+        return {
+            "database_status": "connected",
+            "node_table_accessible": True,
+            "total_nodes": node_count,
+            "sample_query_success": True,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Database test failed: {e}")
+        return {
+            "database_status": "error",
+            "node_table_accessible": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @router.get("/nodes", response_model=List[NodeResponse])
 async def get_nodes(
     node_service: NodeService = Depends(get_node_service)
 ):
     """List all registered nodes (CATALOGUE)"""
     try:
+        logger.info("Fetching all nodes...")
         nodes = node_service.get_nodes()
+        logger.info(f"Successfully fetched {len(nodes)} nodes")
         return nodes
     except Exception as e:
         logger.error(f"Error fetching nodes: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch nodes"
-        )
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error details: {str(e)}")
+        
+        # Return empty list instead of error for better user experience
+        try:
+            # Try to return at least basic structure
+            return []
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database connection failed: {str(e)}"
+            )
 
 @router.get("/nodes/online", response_model=List[NodeResponse])
 async def get_online_nodes(

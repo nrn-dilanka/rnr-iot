@@ -30,8 +30,41 @@ class NodeService:
         return db_node
     
     def get_nodes(self) -> List[Node]:
-        """Get all nodes"""
-        return self.db.query(Node).all()
+        """Get all nodes with enhanced error handling"""
+        try:
+            logger.info("Querying database for all nodes...")
+            
+            # Test database connection first
+            self.db.execute("SELECT 1")
+            
+            # Get all nodes
+            nodes = self.db.query(Node).all()
+            logger.info(f"Successfully retrieved {len(nodes)} nodes from database")
+            return nodes
+            
+        except Exception as e:
+            logger.error(f"Database error in get_nodes: {e}")
+            logger.error(f"Database connection state: {self.db}")
+            
+            # Try to handle specific database errors
+            if "connection" in str(e).lower():
+                logger.error("Database connection issue detected")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Database connection unavailable"
+                )
+            elif "table" in str(e).lower() or "relation" in str(e).lower():
+                logger.error("Database schema issue detected")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Database schema not initialized"
+                )
+            else:
+                logger.error(f"Unknown database error: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Database query failed: {str(e)}"
+                )
     
     def get_node(self, node_id: str) -> Optional[Node]:
         """Get a specific node by ID"""

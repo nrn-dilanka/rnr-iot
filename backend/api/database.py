@@ -14,6 +14,33 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+def init_database():
+    """Initialize database tables with error handling"""
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("Initializing database tables...")
+        
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables initialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        return False
+
+def test_database_connection():
+    """Test database connectivity"""
+    try:
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
+        return True
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Database connection test failed: {e}")
+        return False
+
 class Node(Base):
     __tablename__ = "nodes"
     

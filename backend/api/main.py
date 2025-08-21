@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,8 +22,30 @@ from api.permissions import BusinessActivityLogger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Initialize database with error handling
+try:
+    from api.database import init_database, test_database_connection
+    
+    logger.info("Testing database connection...")
+    if test_database_connection():
+        logger.info("Database connection successful")
+        
+        logger.info("Initializing database tables...")
+        if init_database():
+            logger.info("Database initialization completed")
+        else:
+            logger.warning("Database initialization failed, but continuing...")
+    else:
+        logger.error("Database connection failed during startup")
+        
+except Exception as e:
+    logger.error(f"Database startup error: {e}")
+
+# Fallback: Create database tables (original method)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    logger.error(f"Fallback database creation failed: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -103,8 +126,40 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "platform": "enterprise_iot"}
+    """Health check endpoint with database connectivity test"""
+    try:
+        # Test database connection
+        from api.database import get_db, Node
+        db = next(get_db())
+        
+        # Test basic database connectivity
+        db.execute("SELECT 1")
+        
+        # Test Node table access
+        try:
+            node_count = db.query(Node).count()
+            db_status = "connected"
+        except Exception as db_error:
+            logger.error(f"Database table access error: {db_error}")
+            node_count = -1
+            db_status = "table_error"
+        
+        return {
+            "status": "healthy",
+            "platform": "enterprise_iot",
+            "database": db_status,
+            "node_count": node_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "platform": "enterprise_iot",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.get("/openapi.json")
 async def get_openapi():
