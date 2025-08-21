@@ -45,10 +45,11 @@ async def test_database():
     """Test database connectivity and table access"""
     try:
         from api.database import get_db
+        from sqlalchemy import text
         db = next(get_db())
         
-        # Test basic connection
-        db.execute("SELECT 1")
+        # Test basic connection with proper text() declaration
+        db.execute(text("SELECT 1"))
         
         # Test Node table
         node_count = db.query(Node).count()

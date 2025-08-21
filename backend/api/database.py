@@ -31,8 +31,9 @@ def init_database():
 def test_database_connection():
     """Test database connectivity"""
     try:
+        from sqlalchemy import text
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return True
     except Exception as e:

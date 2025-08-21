@@ -34,8 +34,9 @@ class NodeService:
         try:
             logger.info("Querying database for all nodes...")
             
-            # Test database connection first
-            self.db.execute("SELECT 1")
+            # Test database connection first with proper text() declaration
+            from sqlalchemy import text
+            self.db.execute(text("SELECT 1"))
             
             # Get all nodes
             nodes = self.db.query(Node).all()

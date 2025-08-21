@@ -130,10 +130,11 @@ async def health_check():
     try:
         # Test database connection
         from api.database import get_db, Node
+        from sqlalchemy import text
         db = next(get_db())
         
-        # Test basic database connectivity
-        db.execute("SELECT 1")
+        # Test basic database connectivity with proper text() declaration
+        db.execute(text("SELECT 1"))
         
         # Test Node table access
         try:

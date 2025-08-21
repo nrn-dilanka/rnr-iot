@@ -23,11 +23,17 @@ class ESP32DeviceManager:
         self.device_configs: Dict[str, dict] = {}
         self.db_session = None
         
-        # MQTT Configuration
-        self.mqtt_host = "16.171.30.3"
-        self.mqtt_port = 1883
-        self.mqtt_user = "rnr_iot_user"
-        self.mqtt_password = "rnr_iot_2025!"
+        # MQTT Configuration from environment variables
+        import os
+        self.mqtt_host = os.getenv("MQTT_BROKER_HOST", "localhost")
+        self.mqtt_port = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+        self.mqtt_user = os.getenv("MQTT_USERNAME", "rnr_iot_user")
+        self.mqtt_password = os.getenv("MQTT_PASSWORD", "rnr_iot_2025!")
+        
+        # Connection retry settings from environment
+        self.max_retries = int(os.getenv("MQTT_MAX_RETRIES", "3"))
+        self.retry_delay = int(os.getenv("MQTT_RETRY_DELAY", "5"))
+        self.connection_timeout = int(os.getenv("MQTT_CONNECTION_TIMEOUT", "10"))
         
         # Device discovery topics
         self.data_topic_pattern = "devices/+/data"
@@ -46,14 +52,34 @@ class ESP32DeviceManager:
         self.mqtt_client.on_message = self._on_message
         self.mqtt_client.on_disconnect = self._on_disconnect
         
-        # Connect to MQTT broker
-        try:
-            logger.info(f"Connecting to MQTT broker at {self.mqtt_host}:{self.mqtt_port}")
-            self.mqtt_client.connect(self.mqtt_host, self.mqtt_port, 60)
-            self.mqtt_client.loop_start()
-            logger.info("ESP32 Device Manager started successfully")
-        except Exception as e:
-            logger.error(f"Failed to connect to MQTT broker: {e}")
+        # Connect to MQTT broker with retry logic
+        await self._connect_with_retry()
+            
+    async def _connect_with_retry(self):
+        """Connect to MQTT broker with retry logic"""
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                logger.info(f"Connecting to MQTT broker at {self.mqtt_host}:{self.mqtt_port} (attempt {attempt}/{self.max_retries})")
+                
+                # Set connection timeout
+                self.mqtt_client.socket_timeout = self.connection_timeout
+                
+                result = self.mqtt_client.connect(self.mqtt_host, self.mqtt_port, 60)
+                if result == 0:
+                    self.mqtt_client.loop_start()
+                    logger.info("ESP32 Device Manager started successfully")
+                    return
+                else:
+                    logger.warning(f"MQTT connection failed with code {result}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to connect to MQTT broker (attempt {attempt}): {e}")
+                
+            if attempt < self.max_retries:
+                logger.info(f"Retrying in {self.retry_delay} seconds...")
+                await asyncio.sleep(self.retry_delay)
+        
+        logger.error("All MQTT connection attempts failed - continuing without MQTT")
             
     def _on_connect(self, client, userdata, flags, rc):
         """Callback for MQTT connection"""
@@ -63,11 +89,22 @@ class ESP32DeviceManager:
             client.subscribe(self.data_topic_pattern)
             logger.info(f"📡 Subscribed to device discovery topic: {self.data_topic_pattern}")
         else:
-            logger.error(f"❌ Failed to connect to MQTT broker (code: {rc})")
+            error_codes = {
+                1: "Connection refused - incorrect protocol version",
+                2: "Connection refused - invalid client identifier",
+                3: "Connection refused - server unavailable", 
+                4: "Connection refused - bad username or password",
+                5: "Connection refused - not authorized"
+            }
+            error_msg = error_codes.get(rc, f"Unknown error code {rc}")
+            logger.error(f"❌ Failed to connect to MQTT broker: {error_msg}")
     
     def _on_disconnect(self, client, userdata, rc):
         """Callback for MQTT disconnection"""
-        logger.warning(f"🔌 ESP32 Device Manager disconnected from MQTT (code: {rc})")
+        if rc != 0:
+            logger.warning(f"🔌 ESP32 Device Manager unexpected disconnection from MQTT (code: {rc})")
+        else:
+            logger.info("🔌 ESP32 Device Manager disconnected from MQTT gracefully")
     
     def _on_message(self, client, userdata, msg):
         """Handle incoming device messages for auto-discovery and data processing"""
