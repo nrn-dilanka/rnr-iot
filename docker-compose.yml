@@ -1,22 +1,5 @@
 services:
-  # RNR Solutions - RabbitMQ Message Broker with MQTT plugin (Optimi    environment:
-      DATABASE_URL: postgresql://rnr_iot_user:rnr_iot_2025!@rnr_postgres:5432/rnr_iot_platform
-      RABBITMQ_URL: amqp://rnr_iot_user:rnr_iot_2025!@rnr_rabbitmq:5672/rnr_iot_vhost
-      UPLOAD_DIR: /app/uploads
-      GEMINI_API_KEY: AIzaSyAs2JqPjvUcWeg5K2Vxeto7j37GzUzABUY
-      RNR_COMPANY_NAME: "RNR Solutions"
-      RNR_PLATFORM_VERSION: "2.0.0"
-      # MQTT Configuration
-      MQTT_BROKER_HOST: "16.171.30.3"
-      MQTT_BROKER_PORT: "1883"
-      MQTT_USERNAME: "rnr_iot_user"
-      MQTT_PASSWORD: "rnr_iot_2025!"
-      MQTT_MAX_RETRIES: "3"
-      MQTT_RETRY_DELAY: "5"
-      MQTT_CONNECTION_TIMEOUT: "10"
-      # Python memory optimization
-      PYTHONUNBUFFERED: 1
-      PYTHONDONTWRITEBYTECODE: 1B RAM)
+  # RNR Solutions - RabbitMQ Message Broker with MQTT plugin (Optimized for 2GB RAM)
   rnr_rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rnr_iot_rabbitmq
@@ -100,6 +83,14 @@ services:
       GEMINI_API_KEY: AIzaSyAs2JqPjvUcWeg5K2Vxeto7j37GzUzABUY
       RNR_COMPANY_NAME: "RNR Solutions"
       RNR_PLATFORM_VERSION: "2.0.0"
+      # MQTT Configuration
+      MQTT_BROKER_HOST: "16.171.30.3"
+      MQTT_BROKER_PORT: "1883"
+      MQTT_USERNAME: "rnr_iot_user"
+      MQTT_PASSWORD: "rnr_iot_2025!"
+      MQTT_MAX_RETRIES: "3"
+      MQTT_RETRY_DELAY: "5"
+      MQTT_CONNECTION_TIMEOUT: "10"
       # Python memory optimization
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
@@ -170,9 +161,15 @@ services:
 
 volumes:
   rnr_rabbitmq_data:
+    driver: local
   rnr_postgres_data:
+    driver: local
   rnr_firmware_uploads:
+    driver: local
 
 networks:
   rnr_iot_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
