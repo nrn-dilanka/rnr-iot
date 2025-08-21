@@ -8,7 +8,7 @@ import bcrypt
 import json
 from enum import Enum
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(tags=["authentication"])
 security = HTTPBearer()
 
 # JWT Configuration
