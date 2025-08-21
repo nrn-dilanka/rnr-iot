@@ -15,26 +15,26 @@ router = APIRouter(prefix="/water", tags=["water"])
 water_systems_db = [
     {
         "id": 1,
-        "name": "Primary Irrigation System",
+        "name": "Primary Water System",
         "status": "active",
         "flow_rate": 25.5,
         "pressure": 2.3,
         "temperature": 22.5,
         "ph": 7.2,
         "tds": 650,
-        "location": "Greenhouse Zone A",
+        "location": "Industrial Zone A",
         "last_updated": datetime.now().isoformat()
     },
     {
         "id": 2,
-        "name": "Secondary Irrigation System",
+        "name": "Secondary Water System",
         "status": "inactive",
         "flow_rate": 0.0,
         "pressure": 0.0,
         "temperature": 20.0,
         "ph": None,
         "tds": None,
-        "location": "Greenhouse Zone B",
+        "location": "Industrial Zone B",
         "last_updated": datetime.now().isoformat()
     }
 ]
@@ -68,7 +68,7 @@ async def simulate_water_data_updates():
             # Send usage analytics update every minute
             usage_data = {
                 "usage_data": [
-                    {"time": datetime.now().strftime("%H:%M"), "irrigation": random.randint(0, 200), 
+                    {"time": datetime.now().strftime("%H:%M"), "cooling": random.randint(0, 200), 
                      "supply": random.randint(10, 40), "drainage": random.randint(0, 15)}
                 ],
                 "timestamp": datetime.now().isoformat()
@@ -95,7 +95,7 @@ start_background_task()
 # Pydantic models for request/response
 class WaterSystemCreate(BaseModel):
     name: str
-    type: str  # irrigation, supply, drainage
+    type: str  # cooling, supply, drainage
     description: Optional[str] = None
 
 class WaterSystemUpdate(BaseModel):
@@ -136,8 +136,8 @@ class WaterScheduleUpdate(BaseModel):
 water_systems_db = [
     {
         "id": 1,
-        "name": "Main Irrigation System",
-        "type": "irrigation",
+        "name": "Main Cooling System",
+        "type": "cooling",
         "status": "active",
         "flow_rate": 15.5,
         "pressure": 2.3,
@@ -154,7 +154,7 @@ water_systems_db = [
     },
     {
         "id": 2,
-        "name": "Greenhouse Water Supply",
+        "name": "Industrial Water Supply",
         "type": "supply",
         "status": "active",
         "flow_rate": 8.2,
@@ -193,7 +193,7 @@ water_systems_db = [
 water_schedules_db = [
     {
         "id": 1,
-        "name": "Morning Irrigation",
+        "name": "Morning Cooling Cycle",
         "system_id": 1,
         "start_time": "06:00",
         "duration": 30,
@@ -206,7 +206,7 @@ water_schedules_db = [
     },
     {
         "id": 2,
-        "name": "Evening Irrigation",
+        "name": "Evening Cooling Cycle",
         "system_id": 1,
         "start_time": "18:00",
         "duration": 25,
@@ -223,7 +223,7 @@ water_alerts_db = [
     {
         "id": 1,
         "type": "warning",
-        "message": "Low water pressure detected in Greenhouse Supply",
+        "message": "Low water pressure detected in Industrial Supply",
         "system_id": 2,
         "timestamp": datetime.now() - timedelta(minutes=15),
         "acknowledged": False
@@ -232,7 +232,7 @@ water_alerts_db = [
 
 # Water Systems endpoints
 @router.get("/systems")
-async def get_water_systems(current_user: Dict[str, Any] = Depends(require_sensor_access)):
+async def get_water_systems(current_user: Dict[str, Any] = Depends(require_sensor_access())):
     """Get all water systems (requires sensor access permission)"""
     # Log activity for business tracking
     BusinessActivityLogger.log_activity(
@@ -530,14 +530,14 @@ async def get_water_usage_analytics():
     """Get water usage analytics"""
     # Mock data - in production, this would query actual usage data
     usage_data = [
-        {"time": "00:00", "irrigation": 0, "supply": 15, "drainage": 5},
-        {"time": "06:00", "irrigation": 120, "supply": 25, "drainage": 8},
-        {"time": "12:00", "irrigation": 80, "supply": 35, "drainage": 12},
-        {"time": "18:00", "irrigation": 150, "supply": 20, "drainage": 6},
-        {"time": "24:00", "irrigation": 0, "supply": 18, "drainage": 4}
+        {"time": "00:00", "cooling": 0, "supply": 15, "drainage": 5},
+        {"time": "06:00", "cooling": 120, "supply": 25, "drainage": 8},
+        {"time": "12:00", "cooling": 80, "supply": 35, "drainage": 12},
+        {"time": "18:00", "cooling": 150, "supply": 20, "drainage": 6},
+        {"time": "24:00", "cooling": 0, "supply": 18, "drainage": 4}
     ]
     
-    total_usage = sum([d["irrigation"] + d["supply"] + d["drainage"] for d in usage_data])
+    total_usage = sum([d["cooling"] + d["supply"] + d["drainage"] for d in usage_data])
     
     return {
         "usage_data": usage_data,

@@ -102,9 +102,7 @@ echo "   Note: Use browser or wscat to test ws://13.60.227.209:3005/ws"
 echo ""
 
 # 7. Advanced Features (if available)
-echo "=== 🌱 GREENHOUSE/WATER MANAGEMENT ==="
 test_endpoint "GET" "/api/water/systems" "Get water systems"
-test_endpoint "GET" "/api/greenhouse/zones" "Get greenhouse zones"
 test_endpoint "GET" "/api/monitoring/dashboard" "Get monitoring dashboard"
 
 # 8. Authentication (if enabled)

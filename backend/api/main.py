@@ -11,7 +11,6 @@ from contextlib import asynccontextmanager
 from api.database import engine, Base, get_db
 from api.routes import router
 from api.water_routes import router as water_router
-from api.greenhouse_routes import router as greenhouse_router
 from api.websocket import websocket_manager
 from api.services import get_sensor_data_service, SensorDataService
 from api.esp32_manager import esp32_device_manager
@@ -97,7 +96,6 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth")
 app.include_router(router, prefix="/api")
 app.include_router(water_router, prefix="/api")
-app.include_router(greenhouse_router, prefix="/api")
 
 # Serve uploaded files
 upload_dir = os.getenv("UPLOAD_DIR", "/app/uploads")

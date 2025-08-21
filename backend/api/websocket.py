@@ -144,7 +144,7 @@ class WebSocketManager:
         }
         await self.broadcast(message)
     
-    # Enhanced WebSocket methods for greenhouse features
+    # Enhanced WebSocket methods for industrial features
     async def send_environmental_update(self, zone_id: int, sensor_type: str, value: float, unit: str, quality_score: float = 1.0):
         """Send environmental sensor update for a specific zone"""
         from datetime import datetime

@@ -97,7 +97,7 @@ users_db = [
         "department": "Engineering",
         "role": UserRole.ADMIN,
         "status": UserStatus.ACTIVE,
-        "research_area": "Smart Agriculture",
+        "research_area": "Industrial IoT Systems",
         "created_at": datetime.now(),
         "last_login": None,
         "login_count": 0
