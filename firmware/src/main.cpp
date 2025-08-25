@@ -200,6 +200,16 @@ void connectMQTT() {
       Serial.println("Failed to subscribe to: " + command_topic);
     }
 
+    // Subscribe to retained last-command topic as a fallback to receive the
+    // most recent command if it was published with retain flag while this
+    // device was offline. Use QoS=1 to ensure delivery.
+    String last_cmd_topic = command_topic + "/last";
+    if (client.subscribe(last_cmd_topic.c_str(), 1)) {
+      Serial.println("Subscribed to retained fallback: " + last_cmd_topic + " (qos=1)");
+    } else {
+      Serial.println("Failed to subscribe to retained fallback: " + last_cmd_topic);
+    }
+
     // Publish initial status
     publishStatus("online");
   } else {
@@ -234,6 +244,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String action = doc["action"];
   Serial.print("Action: ");
   Serial.println(action);
+
+  // If this message came from the retained fallback topic, strip '/last' suffix
+  String t = String(topic);
+  if (t.endsWith("/last")) {
+    Serial.println("Received retained last-command fallback topic");
+    // treat payload the same as a live command
+  }
 
   // Handle different commands
   if (action == "REBOOT") {

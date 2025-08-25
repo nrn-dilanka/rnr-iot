@@ -43,6 +43,15 @@ class MQTTCommandPublisher:
             result = self.client.publish(topic, message, qos=1)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 logger.info(f"Published MQTT command to {topic}: {message}")
+                # Also publish a retained "last command" message so devices that
+                # reconnect without persistent subscriptions can still retrieve
+                # the most recent command. This acts as a reliable fallback.
+                try:
+                    retained_topic = f"{topic}/last"
+                    self.client.publish(retained_topic, message, qos=1, retain=True)
+                    logger.info(f"Published retained last-command to {retained_topic}")
+                except Exception as re:
+                    logger.warning(f"Failed to publish retained last-command: {re}")
                 return True
             else:
                 logger.error(f"Failed to publish MQTT command: {result.rc}")
