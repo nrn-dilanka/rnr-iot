@@ -1,0 +1,20 @@
+# MQTT Persistent Session Test Requirements
+
+# Core testing dependencies
+requests>=2.25.1
+paho-mqtt>=1.6.1
+pyserial>=3.5
+
+# JSON handling (usually included with Python)
+# json (built-in)
+
+# Additional utilities
+pytest>=7.0.0  # Optional: for more advanced testing
+pytest-html>=3.1.0  # Optional: for HTML test reports
+
+# Development dependencies (optional)
+black>=22.0.0  # Code formatting
+flake8>=4.0.0  # Code linting
+
+# Installation instructions:
+# pip install -r tests/requirements.txt

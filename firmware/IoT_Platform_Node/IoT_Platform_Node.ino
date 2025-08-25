@@ -66,8 +66,8 @@ unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50;
 int staReconnectFailures = 0;
 
-// MQTT Configuration
-const char* mqtt_server = "51.20.42.126";
+// MQTT Configuration - RabbitMQ MQTT Broker
+const char* mqtt_server = "192.168.8.114"; // Update this to your RabbitMQ server IP
 const int mqtt_port = 1883;
 const char* mqtt_user = "rnr_iot_user";
 const char* mqtt_password = "rnr_iot_2025!";
@@ -85,6 +85,7 @@ const int daylightOffset_sec = 0;
 String node_id;
 String data_topic;
 String command_topic;
+String last_topic;
 
 // MQTT and WiFi clients
 WiFiClient espClient;
@@ -131,10 +132,10 @@ unsigned long lastSensorRead = 0;
 unsigned long lastMqttReconnect = 0;
 unsigned long lastServoDisplay = 0; // For periodic servo angle display
 unsigned long lastHeartbeat = 0; // For periodic heartbeat/status updates
-const unsigned long SENSOR_INTERVAL = 2000; // 2 seconds - reduced load
+const unsigned long SENSOR_INTERVAL = 1000; // 1 second - fast data transmission
 const unsigned long MQTT_RECONNECT_INTERVAL = 5000; // 5 seconds
 const unsigned long SERVO_DISPLAY_INTERVAL = 10000; // 10 seconds for status display
-const unsigned long HEARTBEAT_INTERVAL = 5000; // 5 seconds for connection heartbeat
+const unsigned long HEARTBEAT_INTERVAL = 3000; // 3 seconds for frequent connection heartbeat
 
 // Additional sensor variables for more realistic data
 float baseTemperature = 20.0;
@@ -237,10 +238,12 @@ void setup() {
   // Setup MQTT topics
   data_topic = "devices/" + node_id + "/data";
   command_topic = "devices/" + node_id + "/commands";
+  last_topic = command_topic + "/last";
 
   Serial.println("Node ID: " + node_id);
   Serial.println("Data Topic: " + data_topic);
   Serial.println("Command Topic: " + command_topic);
+  Serial.println("Last-command Topic (retained fallback): " + last_topic);
 
   // Initialize NTP
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -442,38 +445,100 @@ void connectMQTT() {
     return;
   }
 
-  Serial.print("Connecting to MQTT broker: ");
+  Serial.print("Connecting to RabbitMQ MQTT broker: ");
   Serial.print(mqtt_server);
   Serial.print(":");
   Serial.println(mqtt_port);
 
   String clientId = "ESP32-" + node_id;
-
-  // Try to connect with retry logic
-  if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
-    Serial.println("MQTT connected!");
+  String willTopic = "devices/" + node_id + "/status";
+  
+  // Configure for RabbitMQ MQTT with persistent session
+  client.setKeepAlive(60); // 60 second keepalive for persistent sessions
+  client.setSocketTimeout(20); // 20 second socket timeout for better reliability
+  client.setBufferSize(1024); // Larger buffer for RabbitMQ and queued messages
+  
+  // Connect to RabbitMQ MQTT with persistent session and Last Will and Testament
+  // cleanSession = false enables message queuing for disconnected clients
+  if (client.connect(clientId.c_str(), mqtt_user, mqtt_password, 
+                    willTopic.c_str(),              // LWT topic
+                    1,                              // LWT QoS
+                    true,                           // LWT retain
+                    "offline",                      // LWT message
+                    false)) {                       // cleanSession = false for persistent sessions
+    Serial.println("Connected to RabbitMQ MQTT broker with persistent session!");
+    Serial.println("📦 Persistent session enabled - queued messages will be received on reconnect");
     mqtt_retry_count = 0; // Reset retry count on successful connection
 
-    // Subscribe to command topic with QoS=1 so commands sent while device
-    // is offline will be queued by the broker and delivered on reconnect.
+    // Subscribe to command topic with QoS=1 for reliable delivery
+    // QoS=1 ensures at-least-once delivery and works with persistent sessions
     if (client.subscribe(command_topic.c_str(), 1)) {
-      Serial.println("Subscribed to: " + command_topic + " (qos=1)");
+      Serial.println("Subscribed to: " + command_topic + " (qos=1, persistent)");
     } else {
       Serial.println("Failed to subscribe to: " + command_topic);
     }
 
-    // Publish initial status
+    // Subscribe to retained 'last' fallback topic with QoS=1
+    if (client.subscribe(last_topic.c_str(), 1)) {
+      Serial.println("Subscribed to retained fallback: " + last_topic + " (qos=1, persistent)");
+    } else {
+      Serial.println("Failed to subscribe to retained fallback: " + last_topic);
+    }
+
+    // Publish initial status to RabbitMQ
     publishStatus("online");
+    
+    // Send initial data to verify RabbitMQ connection
+    delay(1000);
+    readAndPublishSensors();
+    
+    // Log persistent session info
+    Serial.println("🔄 Persistent session active - checking for queued messages...");
+    Serial.println("💭 Any commands sent while offline will be delivered now");
   } else {
     mqtt_retry_count++;
-    Serial.print("MQTT connection failed, rc=");
+    Serial.print("RabbitMQ MQTT connection failed, rc=");
     Serial.print(client.state());
     Serial.print(", retry count: ");
     Serial.println(mqtt_retry_count);
     
+    // Enhanced error reporting for RabbitMQ troubleshooting
+    switch (client.state()) {
+      case -4:
+        Serial.println("Connection timeout - Check RabbitMQ server IP");
+        break;
+      case -3:
+        Serial.println("Connection lost - Network issue");
+        break;
+      case -2:
+        Serial.println("Connect failed - Check network connectivity");
+        break;
+      case -1:
+        Serial.println("Disconnected - Normal state");
+        break;
+      case 1:
+        Serial.println("Bad protocol version - Check RabbitMQ MQTT plugin");
+        break;
+      case 2:
+        Serial.println("Client ID rejected - Check client ID uniqueness");
+        break;
+      case 3:
+        Serial.println("Server unavailable - RabbitMQ may be down");
+        break;
+      case 4:
+        Serial.println("Bad credentials - Check username/password");
+        break;
+      case 5:
+        Serial.println("Not authorized - Check RabbitMQ permissions");
+        break;
+      default:
+        Serial.println("Unknown error");
+        break;
+    }
+    
     // If max retries reached, restart ESP32
     if (mqtt_retry_count >= MAX_MQTT_RETRIES) {
-      Serial.println("Max MQTT retries reached. Restarting ESP32...");
+      Serial.println("Max RabbitMQ MQTT retries reached. Restarting ESP32...");
       delay(2000);
       ESP.restart();
     }
@@ -481,8 +546,11 @@ void connectMQTT() {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message received on topic: ");
+  Serial.print("📨 Message received on topic: ");
   Serial.println(topic);
+  Serial.print("📏 Message length: ");
+  Serial.print(length);
+  Serial.println(" bytes");
 
   // Convert payload to string
   String message = "";
@@ -490,17 +558,49 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     message += (char)payload[i];
   }
 
-  Serial.print("Message: ");
+  Serial.print("📋 Message content: ");
   Serial.println(message);
 
   // Parse JSON command
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<256> doc; // Increased size for timestamp
   DeserializationError error = deserializeJson(doc, message);
 
   if (error) {
     Serial.print("JSON parsing failed: ");
     Serial.println(error.c_str());
     return;
+  }
+
+  // Detect and handle potentially stale retained/fallback messages
+  String topicStr = String(topic);
+  if (topicStr.endsWith("/last")) {
+    Serial.println("(This message arrived on the retained '/last' fallback topic)");
+    
+    if (doc.containsKey("cmd_timestamp")) {
+      time_t cmd_timestamp = doc["cmd_timestamp"];
+      time_t now;
+      time(&now); // Get current time (epoch)
+
+      const long STALE_MESSAGE_THRESHOLD_SECONDS = 60 * 5; // 5 minutes
+
+      Serial.print("Retained message timestamp: ");
+      Serial.println(cmd_timestamp);
+      Serial.print("Current device time: ");
+      Serial.println(now);
+
+      if (now > 0 && cmd_timestamp > 0) { // Ensure both times are valid
+        if ((now - cmd_timestamp) > STALE_MESSAGE_THRESHOLD_SECONDS) {
+          Serial.println("Ignoring stale retained command (older than 5 minutes).");
+          return; // Discard the stale message
+        } else {
+          Serial.println("Retained command is recent. Processing...");
+        }
+      } else {
+        Serial.println("Could not verify message timestamp (NTP time may not be synced). Processing anyway.");
+      }
+    } else {
+      Serial.println("Retained message has no timestamp. Processing...");
+    }
   }
 
   String action = doc["action"];
@@ -617,22 +717,22 @@ void readAndPublishSensors() {
     return;
   }
 
-  // Publish to MQTT with multiple attempts
+  // Publish to RabbitMQ MQTT with QoS=1 and multiple attempts
   bool published = false;
   for (int attempt = 0; attempt < 3 && !published; attempt++) {
-    if (client.connected() && client.publish(data_topic.c_str(), payload.c_str())) {
+    if (client.connected() && client.publish(data_topic.c_str(), (const uint8_t*)payload.c_str(), payload.length(), false)) {
       published = true;
-      Serial.println("✅ Sensor data published (attempt " + String(attempt + 1) + "):");
+      Serial.println("✅ Data sent to RabbitMQ (attempt " + String(attempt + 1) + "):");
       Serial.println(payload);
     } else {
-      Serial.println("❌ Publish attempt " + String(attempt + 1) + " failed");
+      Serial.println("❌ RabbitMQ publish attempt " + String(attempt + 1) + " failed");
       Serial.print("MQTT Connected: ");
       Serial.println(client.connected() ? "Yes" : "No");
       Serial.print("MQTT State: ");
       Serial.println(client.state());
       
       if (!client.connected()) {
-        Serial.println("🔄 Reconnecting MQTT...");
+        Serial.println("🔄 Reconnecting to RabbitMQ MQTT...");
         connectMQTT();
         delay(100); // Small delay between attempts
       }
@@ -640,7 +740,9 @@ void readAndPublishSensors() {
   }
   
   if (!published) {
-    Serial.println("❌ All publish attempts failed for sensor data");
+    Serial.println("❌ All RabbitMQ publish attempts failed for sensor data");
+    Serial.println("📋 Data that failed to send:");
+    Serial.println(payload);
   }
 }
 
@@ -659,7 +761,7 @@ void publishHeartbeat() {
   // Publish heartbeat with retry
   bool published = false;
   for (int attempt = 0; attempt < 2 && !published; attempt++) {
-    if (client.connected() && client.publish(data_topic.c_str(), payload.c_str())) {
+    if (client.connected() && client.publish(data_topic.c_str(), (const uint8_t*)payload.c_str(), payload.length())) {
       published = true;
       Serial.println("💓 Heartbeat sent - Device Online");
     } else {
@@ -700,7 +802,7 @@ void publishStatus(String status) {
   serializeJson(doc, payload);
 
   // Publish to MQTT and display to Serial Monitor
-  if (client.connected() && client.publish(data_topic.c_str(), payload.c_str())) {
+  if (client.connected() && client.publish(data_topic.c_str(), (const uint8_t*)payload.c_str(), payload.length())) {
     Serial.println("✅ Status published: " + status);
     Serial.println(payload);
     Serial.print("Current servo angle: ");
@@ -802,7 +904,7 @@ void testMQTTPublish() {
   Serial.println(client.state());
   
   if (client.connected()) {
-    if (client.publish(data_topic.c_str(), payload.c_str())) {
+    if (client.publish(data_topic.c_str(), (const uint8_t*)payload.c_str(), payload.length())) {
       Serial.println("✅ Test message published successfully");
     } else {
       Serial.println("❌ Test message publish failed");

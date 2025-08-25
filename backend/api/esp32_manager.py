@@ -23,28 +23,40 @@ class ESP32DeviceManager:
         self.device_configs: Dict[str, dict] = {}
         self.db_session = None
         
-        # MQTT Configuration from environment variables
+        # MQTT Configuration with persistent session support
         import os
         self.mqtt_host = os.getenv("MQTT_BROKER_HOST", "localhost")
         self.mqtt_port = int(os.getenv("MQTT_BROKER_PORT", "1883"))
         self.mqtt_user = os.getenv("MQTT_USERNAME", "rnr_iot_user")
         self.mqtt_password = os.getenv("MQTT_PASSWORD", "rnr_iot_2025!")
         
-        # Connection retry settings from environment
+        # Enhanced connection settings for persistent sessions
         self.max_retries = int(os.getenv("MQTT_MAX_RETRIES", "3"))
         self.retry_delay = int(os.getenv("MQTT_RETRY_DELAY", "5"))
         self.connection_timeout = int(os.getenv("MQTT_CONNECTION_TIMEOUT", "10"))
+        self.keepalive = 60  # Longer keepalive for persistent sessions
+        self.qos_level = 1   # QoS=1 for reliable command delivery
         
         # Device discovery topics
         self.data_topic_pattern = "devices/+/data"
         self.command_topic_pattern = "devices/{}/commands"
         
+        logger.info("🚀 ESP32 Device Manager with persistent MQTT sessions")
+        logger.info(f"   - MQTT Broker: {self.mqtt_host}:{self.mqtt_port}")
+        logger.info(f"   - QoS Level: {self.qos_level}")
+        logger.info(f"   - Persistent Sessions: Enabled")
+        
     async def initialize(self):
         """Initialize the MQTT client and start device discovery"""
         logger.info("Initializing ESP32 Device Manager...")
         
-        # Setup MQTT client
-        self.mqtt_client = mqtt.Client("esp32_device_manager")
+        # Setup MQTT client with persistent session
+        client_id = "esp32_device_manager_backend"
+        self.mqtt_client = mqtt.Client(
+            client_id=client_id,
+            clean_session=False,  # Enable persistent sessions
+            protocol=mqtt.MQTTv311
+        )
         self.mqtt_client.username_pw_set(self.mqtt_user, self.mqtt_password)
         
         # Set callbacks
@@ -395,19 +407,35 @@ class ESP32DeviceManager:
             logger.error(f"Error updating device status for {device_id}: {e}")
     
     async def send_command_to_device(self, device_id: str, command: dict):
-        """Send a command to a specific ESP32 device"""
+        """Send a command to a specific ESP32 device with persistent session support"""
         try:
             command_topic = self.command_topic_pattern.format(device_id)
-            command["timestamp"] = datetime.utcnow().isoformat()
             
-            self.mqtt_client.publish(command_topic, json.dumps(command))
+            # Add enhanced command metadata
+            enhanced_command = {
+                **command,
+                "timestamp": datetime.utcnow().isoformat(),
+                "cmd_timestamp": int(datetime.utcnow().timestamp()),  # For staleness detection
+                "message_id": f"cmd_{int(datetime.utcnow().timestamp() * 1000)}",
+                "source": "backend_api"
+            }
             
-            logger.info(f"📤 Sent command to device {device_id}: {command.get('action', 'unknown')}")
+            # Publish with QoS=1 for reliable delivery with persistent sessions
+            message_info = self.mqtt_client.publish(
+                command_topic,
+                json.dumps(enhanced_command),
+                qos=self.qos_level,  # QoS=1 for reliable delivery
+                retain=False
+            )
+            
+            logger.info(f"📤 Command queued for device {device_id}: {command.get('action', 'unknown')}")
+            logger.info(f"📦 Using persistent session - command will be delivered when device comes online")
+            logger.info(f"🔖 Message ID: {enhanced_command['message_id']}")
             
             return True
             
         except Exception as e:
-            logger.error(f"Error sending command to device {device_id}: {e}")
+            logger.error(f"Error queuing command for device {device_id}: {e}")
             return False
     
     async def broadcast_command_to_all(self, command: dict):

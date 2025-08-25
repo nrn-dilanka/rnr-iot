@@ -301,25 +301,84 @@ async def send_node_action(
     if action.value is not None:
         command["value"] = action.value
     
-    # Send command via ESP32 Device Manager (MQTT)
+    # Send command via ESP32 Device Manager (MQTT with persistent sessions)
     try:
         from api.esp32_manager import esp32_device_manager
+        
+        logger.info(f"📤 Sending command '{action.action}' to device {node_id}")
+        logger.info(f"📦 Using persistent MQTT sessions - command will be queued if device offline")
         
         success = await esp32_device_manager.send_command_to_device(node_id, command)
         
         if success:
-            logger.info(f"✅ Command '{action.action}' sent to device {node_id} via WiFi/MQTT")
-            return ActionResponse(message=f"Command '{action.action}' sent successfully via WiFi/MQTT")
+            logger.info(f"✅ Command '{action.action}' queued for device {node_id} via MQTT")
+            logger.info(f"🔄 Device will receive command when online (persistent session)")
+            return ActionResponse(message=f"Command '{action.action}' queued successfully for delivery via MQTT")
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send command via WiFi/MQTT"
+                detail="Failed to queue command via MQTT"
             )
     except Exception as e:
         logger.error(f"Error sending command to node {node_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send command: {str(e)}"
+        )
+
+# New endpoint for persistent session status
+@router.get("/mqtt/status")
+async def get_mqtt_status():
+    """Get MQTT broker status and persistent session information"""
+    try:
+        from api.esp32_manager import esp32_device_manager
+        from api.mqtt_publisher import mqtt_command_publisher
+        
+        status_info = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "persistent_sessions": {
+                "enabled": True,
+                "description": "Commands are queued for offline devices"
+            },
+            "device_manager": {
+                "connected_devices": len(esp32_device_manager.connected_devices),
+                "device_list": list(esp32_device_manager.connected_devices)
+            },
+            "mqtt_publisher": {
+                "commands_sent": mqtt_command_publisher.commands_sent,
+                "commands_failed": mqtt_command_publisher.commands_failed,
+                "connection_status": mqtt_command_publisher.is_connected,
+                "qos_level": mqtt_command_publisher.qos_level,
+                "clean_session": mqtt_command_publisher.clean_session
+            }
+        }
+        
+        return status_info
+        
+    except Exception as e:
+        logger.error(f"Error getting MQTT status: {e}")
+        return {
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@router.post("/nodes/{node_id}/commands/queue-status")
+async def get_node_command_queue_status(node_id: str):
+    """Check if there are queued commands for a specific node"""
+    try:
+        # This would require RabbitMQ management API to check queue depth
+        # For now, return basic information
+        return {
+            "node_id": node_id,
+            "persistent_session": True,
+            "message": "Commands sent to this device will be queued if device is offline",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error checking queue status for {node_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check queue status: {str(e)}"
         )
 
 # Alias for singular action endpoint (for compatibility)

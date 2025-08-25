@@ -12,7 +12,8 @@ echo "VHost: rnr_iot_vhost"
 
 echo ""
 echo "📊 CURRENT QUEUE STATUS:"
-docker exec rnr_iot_rabbitmq rabbitmqctl list_queues name messages consumers memory state -p rnr_iot_vhost
+# Only show queue name and active consumers to avoid displaying queued message counts
+docker exec rnr_iot_rabbitmq rabbitmqctl list_queues name consumers -p rnr_iot_vhost
 
 echo ""
 echo "🔄 EXCHANGES:"
@@ -25,8 +26,8 @@ docker exec rnr_iot_rabbitmq rabbitmqctl list_bindings source_name destination_n
 echo ""
 echo "🖥️ MANAGEMENT COMMANDS:"
 echo ""
-echo "1. View Queue Details:"
-echo "   docker exec rnr_iot_rabbitmq rabbitmqctl list_queues name messages consumers -p rnr_iot_vhost"
+echo "1. View Queue Details (no queued counts):"
+echo "   docker exec rnr_iot_rabbitmq rabbitmqctl list_queues name consumers -p rnr_iot_vhost"
 echo ""
 echo "2. Purge Queue (CAREFUL!):"
 echo "   docker exec rnr_iot_rabbitmq rabbitmqctl purge_queue device_data -p rnr_iot_vhost"
