@@ -17,10 +17,14 @@ class MQTTCommandPublisher:
     def connect(self):
         """Connect to MQTT broker"""
         try:
-            self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+            # Create a named client and use a persistent session so broker can queue
+            # messages for subscriptions that belong to this client if needed.
+            self.client = mqtt.Client(client_id="rnr_backend_publisher", clean_session=False, protocol=mqtt.MQTTv311)
             self.client.username_pw_set(self.mqtt_user, self.mqtt_password)
             self.client.connect(self.mqtt_host, self.mqtt_port, 60)
-            logger.info(f"Connected to MQTT broker at {self.mqtt_host}:{self.mqtt_port}")
+            # Start network loop in background to ensure in-flight messages and QoS1/2 delivery are handled
+            self.client.loop_start()
+            logger.info(f"Connected to MQTT broker at {self.mqtt_host}:{self.mqtt_port} (client_id=rnr_backend_publisher)")
             return True
         except Exception as e:
             logger.error(f"Failed to connect to MQTT broker: {e}")

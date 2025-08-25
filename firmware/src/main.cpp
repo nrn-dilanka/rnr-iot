@@ -193,9 +193,9 @@ void connectMQTT() {
   if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
     Serial.println("MQTT connected!");
 
-    // Subscribe to command topic
-    if (client.subscribe(command_topic.c_str())) {
-      Serial.println("Subscribed to: " + command_topic);
+    // Subscribe to command topic with QoS=1 so commands are queued for offline devices
+    if (client.subscribe(command_topic.c_str(), 1)) {
+      Serial.println("Subscribed to: " + command_topic + " (qos=1)");
     } else {
       Serial.println("Failed to subscribe to: " + command_topic);
     }

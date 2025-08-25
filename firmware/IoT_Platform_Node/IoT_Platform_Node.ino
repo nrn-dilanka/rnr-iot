@@ -67,7 +67,7 @@ unsigned long debounceDelay = 50;
 int staReconnectFailures = 0;
 
 // MQTT Configuration
-const char* mqtt_server = "16.171.30.3";
+const char* mqtt_server = "51.20.42.126";
 const int mqtt_port = 1883;
 const char* mqtt_user = "rnr_iot_user";
 const char* mqtt_password = "rnr_iot_2025!";
@@ -90,7 +90,7 @@ String command_topic;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// Servo Configuration
+// Servo 
 Servo servo;
 const int servoPin = 16; // GPIO16 for servo signal
 int servoAngle = 90; // Initial servo position (middle)
@@ -114,7 +114,6 @@ bool smartModeEnabled = true;
 int lightOnHour = 18;   // Turn on lights at 6 PM
 int lightOffHour = 6;   // Turn off lights at 6 AM
 float fanTempThreshold = 28.0; // Turn on fan if temperature > 28°C
-float fanHumidityThreshold = 70.0; // Turn on fan if humidity > 70%
 
 // Gas Sensor Configuration
 const int gasSensorPin = 34; // GPIO 34 for MQ gas sensor (ADC input)
@@ -455,9 +454,10 @@ void connectMQTT() {
     Serial.println("MQTT connected!");
     mqtt_retry_count = 0; // Reset retry count on successful connection
 
-    // Subscribe to command topic
-    if (client.subscribe(command_topic.c_str())) {
-      Serial.println("Subscribed to: " + command_topic);
+    // Subscribe to command topic with QoS=1 so commands sent while device
+    // is offline will be queued by the broker and delivered on reconnect.
+    if (client.subscribe(command_topic.c_str(), 1)) {
+      Serial.println("Subscribed to: " + command_topic + " (qos=1)");
     } else {
       Serial.println("Failed to subscribe to: " + command_topic);
     }
@@ -565,8 +565,6 @@ void readAndPublishSensors() {
   humidityMQValue = analogRead(humidityMQPin); // Raw analog reading from GPIO 25
   
   // Convert MQ humidity sensor reading to percentage (0-100%)
-  // MQ sensors typically output higher voltage for higher humidity
-  // Adjust calibration values based on your specific MQ sensor
   humidityMQPercent = map(humidityMQValue, 0, 4095, 0, 100); // Basic linear conversion
   humidityMQPercent = constrain(humidityMQPercent, 0.0, 100.0);
 
@@ -589,8 +587,8 @@ void readAndPublishSensors() {
     doc["timestamp"] = timeString;
   }
 
-  // Core sensor data
-  doc["temperature"] = round(temperature * 10) / 10.0;
+  // Core sensor data - TEMPERATURE IS INCLUDED HERE
+  doc["temperature"] = round(temperature * 10) / 10.0; // This is your temperature data
   doc["humidity"] = round(humidity * 10) / 10.0; // Simulated humidity
   doc["humidity_mq"] = round(humidityMQPercent * 10) / 10.0; // MQ humidity sensor from GPIO 25
   doc["humidity_mq_raw"] = humidityMQValue; // Raw ADC value from MQ sensor
@@ -924,8 +922,8 @@ void handleSmartAutomation() {
   }
   
   // Smart fan control based on temperature and humidity
-  bool shouldFanBeOn = (temperature > fanTempThreshold) || (humidity > fanHumidityThreshold);
-  
+  bool shouldFanBeOn = (temperature > fanTempThreshold);
+
   if (shouldFanBeOn != fanState) {
     handleFanControl(shouldFanBeOn);
     Serial.print("🤖 Smart Fan Control: Auto ");
@@ -943,6 +941,27 @@ void handleSmartAutomation() {
       handleFanControl(true);
       Serial.println("🚨 Smart Gas Safety: Fan turned ON due to high gas level!");
     }
+  }
+}
+
+void sendTemperatureOnly() {
+  // Update temperature value
+  temperature += random(-25, 26) / 100.0;
+  temperature = constrain(temperature, 15.0, 35.0);
+
+  // Create minimal JSON with just temperature
+  StaticJsonDocument<100> doc;
+  doc["temperature"] = round(temperature * 10) / 10.0;
+  doc["node_id"] = node_id;
+  doc["timestamp"] = millis();
+
+  String payload;
+  serializeJson(doc, payload);
+
+  // Publish to MQTT
+  if (client.connected()) {
+    client.publish(data_topic.c_str(), payload.c_str());
+    Serial.println("🌡️ Temperature sent: " + String(temperature) + "°C");
   }
 }
 
